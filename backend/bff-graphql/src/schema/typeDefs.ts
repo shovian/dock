@@ -176,6 +176,55 @@ export const typeDefs = gql`
     hasMasterPin: Boolean!
   }
 
+  "One option of a board ask. built marks what sous already built: picking it confirms, any other choice is a revision."
+  type BoardOption {
+    key: String!
+    label: String!
+    effect: String
+    built: Boolean!
+  }
+
+  type BoardAsk {
+    question: String!
+    options: [BoardOption!]!
+  }
+
+  type BoardAnswerPart {
+    ask: Int!
+    choice: String
+    text: String
+  }
+
+  "A blackboard entry that waits on the owner: an issue I-n with Resolver OWNER or a SHOV decision D-n."
+  type BoardItem {
+    id: ID!
+    epic: String!
+    kind: String!
+    ref: String!
+    title: String!
+    tickets: [String!]!
+    type: String
+    status: String
+    resolver: String
+    blocks: String
+    escalated: Boolean!
+    detail: String
+    asks: [BoardAsk!]!
+    prs: [String!]!
+    findings: String
+    source: String
+    "The owner's answer that sous has not written to the board yet."
+    pending: [BoardAnswerPart!]
+    keepsBuilt: Boolean
+    answeredAt: String
+  }
+
+  input BoardAnswerInput {
+    ask: Int!
+    choice: String
+    text: String
+  }
+
   type NeedsAttentionItem {
     id: ID!
     type: String!
@@ -705,6 +754,7 @@ export const typeDefs = gql`
     ticketDetail(key: String!): Ticket
     ticketRelationGroup(ticketKey: String!): TicketRelationGroup!
     needsAttention: [NeedsAttentionItem!]!
+    boardItems: [BoardItem!]!
     settings: Settings
     jiraProjects(url: String, email: String, token: String): [JiraProject!]!
     githubRepos(token: String): [GitHubRepo!]!
@@ -746,6 +796,8 @@ export const typeDefs = gql`
   }
 
   type Mutation {
+    "Saves the owner's answer to a board item; sous writes it to the board later. A new answer before then replaces the old one."
+    answerBoardItem(id: ID!, answers: [BoardAnswerInput!]!): Boolean!
     lockSession: Boolean!
     saveDemoLink(ticketKey: String!, url: String!): Boolean
     sendToDiscord(ticketKey: String!, customMessage: String, threadId: String, threadName: String): Boolean

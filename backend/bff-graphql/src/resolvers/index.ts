@@ -1,4 +1,5 @@
 import { boardMode, refuseInBoardMode } from '../board-mode';
+import { BoardInputError, boardService } from '../integrations/board';
 import { JiraAPI, JiraTicketLookupError } from '../datasources/JiraAPI';
 import { GitHubAPI } from '../datasources/GitHubAPI';
 import { DiscordAPI } from '../datasources/DiscordAPI';
@@ -32,7 +33,7 @@ const storageAPI = new StorageAPI();
 const isPresent = <T>(value: T | null | undefined): value is T => value != null;
 
 function orchestratorInputError(error: unknown): never {
-  if (error instanceof OrchestratorInputError) {
+  if (error instanceof OrchestratorInputError || error instanceof BoardInputError) {
     throw new GraphQLError(error.message, { extensions: { code: 'BAD_USER_INPUT' } });
   }
   throw error;
@@ -169,6 +170,7 @@ export const resolvers = {
     ticketRelationGroup: async (_: any, { ticketKey }: { ticketKey: string }) => {
       return storageAPI.getTicketRelationGroup(ticketKey);
     },
+    boardItems: () => boardService.list(),
     needsAttention: async () => {
       const [agentItems, pullRequestItems] = await Promise.all([
         orchestratorService.needsAttention().catch((error) => {
@@ -319,6 +321,7 @@ export const resolvers = {
   },
 
   Mutation: {
+    answerBoardItem: (_: unknown, { id, answers }: { id: string; answers: unknown }) => boardService.answer(id, answers).catch(orchestratorInputError),
     lockSession: async (_: unknown, __: unknown, context: AuthContext) => {
       context.sessions.clear(context.request, context.response);
       return true;
@@ -582,13 +585,14 @@ export const resolvers = {
 };
 
 export const protectedQueries = [
-  'dashboard', 'ticketDetail', 'ticketRelationGroup', 'needsAttention', 'jiraProjects', 'githubRepos', 'quickLinks', 'calendarEvents', 'monitors',
+  'dashboard', 'ticketDetail', 'ticketRelationGroup', 'needsAttention', 'boardItems', 'jiraProjects', 'githubRepos', 'quickLinks', 'calendarEvents', 'monitors',
   'dockerRuntime', 'dockerContainerLogs', 'orchestrations', 'orchestration', 'ingestTokens', 'elevenLabsKeys', 'devServers', 'devServerLog', 'demoVideos', 'demoStorage',
   'chatSessions', 'chatSession', 'chatMessages', 'chatActivity', 'chatSessionWorkers', 'chatActivityDetail', 'chatSearch', 'chatBridge', 'chatMachines', 'chatStatus', 'chatBalloons',
   'chatCommands', 'chatMachineOptions',
   'sprintList', 'sprintDashboard', 'sprintTrend', 'sprintDashboardSettings', 'sprintIssueEvents', 'orchestratorCronSettings', 'orchestratorCronStatus', 'pushPublicKey',
 ] as const;
 export const protectedMutations = [
+  'answerBoardItem',
   'saveDemoLink',
   'sendToDiscord',
   'setTicketDependency',
