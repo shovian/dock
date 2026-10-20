@@ -13,6 +13,7 @@ import { MonthCalendar } from '../components/MonthCalendar';
 import { Button, Card, Dialog, IconButton, Input, Page, Select } from '../components/ui';
 import { cn } from '../lib/cn';
 import { hasPage, useDockMode } from '../lib/dockMode';
+import { useBoardMode } from '../lib/boardMode';
 import { CACHED_QUERY_OPTIONS, isInitialQueryLoading } from '../lib/queryPolicy';
 import { DEFAULT_SERVICE_HEALTH_REFRESH_SECONDS, normalizeServiceHealthRefreshSeconds } from '../lib/serviceHealthRefresh';
 import type { CalendarEvent } from '../lib/calendar';
@@ -33,6 +34,8 @@ const textActionClass = 'h-6 max-[760px]:h-11 border-0 px-0 py-0 text-[0.68rem] 
 
 const HomePage: React.FC<HomePageProps> = ({ onTicketClick, onNavigate }) => {
   const mode = useDockMode();
+  // The upstream greeting names its author; a board-mode DOCK belongs to someone else.
+  const ownerName = useBoardMode() ? '' : 'Danu';
   const showCalendar = hasPage(mode, '/calendar');
   const showDocker = hasPage(mode, '/docker');
   const [healthRefreshSeconds, setHealthRefreshSeconds] = useState(DEFAULT_SERVICE_HEALTH_REFRESH_SECONDS);
@@ -103,7 +106,7 @@ const HomePage: React.FC<HomePageProps> = ({ onTicketClick, onNavigate }) => {
     <Page width="full">
       <header className="mb-6 flex items-start justify-between gap-6 max-[600px]:items-end">
         <div>
-          <h1 className="text-balance font-display text-[clamp(2rem,4vw,2.75rem)] leading-[1.05] font-bold max-[600px]:text-[1.65rem]">{greeting}, Danu.</h1>
+          <h1 className="text-balance font-display text-[clamp(2rem,4vw,2.75rem)] leading-[1.05] font-bold max-[600px]:text-[1.65rem]">{greeting}{ownerName ? `, ${ownerName}` : ''}.</h1>
           <p className="mt-2 text-pretty text-secondary-foreground max-[600px]:text-[0.72rem]">Here is what needs your attention before you start working.</p>
         </div>
         <div className="flex-none text-right">

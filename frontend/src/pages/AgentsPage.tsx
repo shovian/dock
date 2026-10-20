@@ -12,6 +12,7 @@ import { isPhone } from '../lib/phone';
 import { apiOrigin } from '../lib/apollo';
 import { cn } from '../lib/cn';
 import { hasPage, useDockMode } from '../lib/dockMode';
+import { answerHint, useBoardMode } from '../lib/boardMode';
 import { CACHED_QUERY_OPTIONS, isInitialQueryLoading } from '../lib/queryPolicy';
 import { FILTER_KINDS, FILTER_MACHINES, PARKED_TEXT, START_FAILED_TEXT, completeRun, formatAge, reviewFindings, hasTrouble, isArchived, kindLabel, matchesRunFilter, offerOf, pageOf, runActions, runFilterFromSearch, runFilterSearch, runStatus, sortRuns, stageColor, stageLabel, stageName, statusLabel, type AgentEvent, type AgentRun, type AgentTimeline, type RunFilter, type RunSort, type RunSortColumn, type RunStatus } from '../agents/runs';
 import { KindBadge } from '../agents/KindBadge';
@@ -103,7 +104,9 @@ const AgentsPage: React.FC<AgentsPageProps> = ({ onTicketClick, onNavigate }) =>
   const [stopAllAgents, { loading: stoppingAll }] = useMutation(STOP_ALL_AGENTS);
   const [showCron, setShowCron] = useState(false);
   const [cronError, setCronError] = useState('');
-  const chat = hasPage(useDockMode(), '/sessions');
+  const board = useBoardMode();
+  // Board mode drops everything that acts on chat sessions: work starts from the blackboard.
+  const chat = hasPage(useDockMode(), '/sessions') && !board;
   const { data: balloonData } = useQuery<{ chatBalloons: ChatMessage[]; chatSessions: Array<{ id: string; ticketKey?: string | null }> }>(GET_CHAT_BALLOONS, { fetchPolicy: 'network-only', pollInterval: POLL_MS, skip: !chat });
   const balloons = useMemo(() => ticketBalloons(balloonData?.chatBalloons || [], balloonData?.chatSessions || []), [balloonData]);
   const { openForTicket, opening: openingChat, error: chatError } = useOpenForTicket();
@@ -458,8 +461,8 @@ const AgentsPage: React.FC<AgentsPageProps> = ({ onTicketClick, onNavigate }) =>
                 <div className="rounded-[8px] border border-amber-300/50 bg-amber-300/10 px-3 py-2.5 text-sm">
                   <b className="mb-0.5 block font-mono text-[0.66rem] font-bold uppercase tracking-[0.08em] text-amber-200">Waiting on you</b>
                   <span className="text-pretty">{selected.waiting}</span>
-                  <p className="mt-1.5 text-pretty text-xs text-muted-foreground">{machineOf(selected) === CHAT_MACHINE ? 'Answer here, or' : 'Answer'} in the Claude Code session on {machinePlace(machineOf(selected))}.</p>
-                  {actions?.confirm && (selected.waiting === PARKED_TEXT || selected.waiting === START_FAILED_TEXT)
+                  <p className="mt-1.5 text-pretty text-xs text-muted-foreground">{answerHint(board, machineOf(selected) === CHAT_MACHINE, machinePlace(machineOf(selected)))}</p>
+                  {!board && actions?.confirm && (selected.waiting === PARKED_TEXT || selected.waiting === START_FAILED_TEXT)
                     ? <Button size="sm" variant="primary" className="mt-2 h-7 px-2.5" disabled={confirming} onClick={() => void runAction(async () => { await confirmOrchestration({ variables: { key: selected.key } }); await refetch(); })}>{selected.waiting === PARKED_TEXT ? 'Confirm and start' : 'Retry'}</Button>
                     : actions?.chat && machineOf(selected) === CHAT_MACHINE && <Button size="sm" className="mt-2 h-7 px-2.5" disabled={openingChat} onClick={() => void openForTicket(selected.key)}>Reply here</Button>}
                 </div>

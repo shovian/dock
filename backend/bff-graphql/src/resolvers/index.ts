@@ -1,3 +1,4 @@
+import { boardMode, refuseInBoardMode } from '../board-mode';
 import { JiraAPI, JiraTicketLookupError } from '../datasources/JiraAPI';
 import { GitHubAPI } from '../datasources/GitHubAPI';
 import { DiscordAPI } from '../datasources/DiscordAPI';
@@ -107,6 +108,7 @@ export const resolvers = {
     },
     // Public: the page needs it before the PIN to know which navigation to draw.
     dockMode: () => dockMode(),
+    boardMode: () => boardMode(),
     dashboard: async () => {
       // Scatter-gather parallel fetching
       const [tickets] = await Promise.all([
@@ -325,6 +327,7 @@ export const resolvers = {
       return await storageAPI.saveDemoLink(ticketKey, url);
     },
     sendToDiscord: async (_: any, { ticketKey, customMessage, threadId, threadName }: { ticketKey: string, customMessage?: string, threadId?: string, threadName?: string }) => {
+      refuseInBoardMode('Posting to Discord from DOCK');
       const relation = await storageAPI.getTicketRelationGroup(ticketKey);
       const tickets = (await Promise.all(relation.ticketKeys.map((key) => jiraAPI.getTicket(key)))).filter(isPresent);
       if (tickets.length === 0) return false;

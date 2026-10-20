@@ -7,6 +7,7 @@ export const GET_AUTH_STATUS = gql`
       hasMasterPin
     }
     dockMode
+    boardMode
   }
 `;
 

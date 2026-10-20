@@ -81,6 +81,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
 
     assert.deepStrictEqual(queryFields, [
       'authStatus',
+      'boardMode',
       'calendarEvents',
       'chatActivity',
       'chatActivityDetail',
@@ -188,7 +189,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
   });
 
   await t.test('should put every root field behind the PIN or on the named public list', () => {
-    const publicQueries = ['authStatus', 'dockMode', 'settings'];
+    const publicQueries = ['authStatus', 'boardMode', 'dockMode', 'settings'];
     const publicMutations = ['lockSession', 'verifyMasterPin', 'setMasterPin'];
     const schema = buildASTSchema(typeDefs);
     for (const [fields, guarded, open] of [

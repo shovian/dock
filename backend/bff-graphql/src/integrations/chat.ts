@@ -1,3 +1,4 @@
+import { refuseInBoardMode } from '../board-mode';
 import { randomUUID } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import { CAVEMAN_LEVELS, CHAT_MODES } from '../datasources/StorageAPI';
@@ -1043,6 +1044,7 @@ export class ChatService {
 
   /** Answers the agent on a ticket: the text goes to the newest DOCK session of that ticket, after its turn if one runs. */
   async answerTicket(ticketKeyInput: string, textInput: string, machines: string[]) {
+    refuseInBoardMode('Answering a ticket in its chat session');
     const ticketKey = typeof ticketKeyInput === 'string' ? ticketKeyInput.trim().toUpperCase() : '';
     if (!ticketKey) throw new OrchestratorInputError('ticketKey is required');
     const session = (await this.storage.getChatSessions('dock', SESSIONS_LIMIT.max)).find((row) => row.ticketKey?.toUpperCase() === ticketKey);

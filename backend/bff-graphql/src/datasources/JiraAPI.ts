@@ -1,3 +1,4 @@
+import { boardMode } from '../board-mode';
 import { StorageAPI } from './StorageAPI';
 import { JiraCredentials, JiraService } from '../integrations/jira';
 
@@ -57,6 +58,11 @@ export class JiraAPI {
 
   /** True when the ticket was moved; a missing transition or a Jira error is false, never a throw. */
   async transitionTicket(key: string, statusName: string): Promise<boolean> {
+    // Board mode: Jira status changes stay with the owner.
+    if (boardMode()) {
+      console.warn(`[BFF JiraAPI] Board mode: not moving ${key} to ${statusName}`);
+      return false;
+    }
     try {
       const { credentials } = await this.getConfiguration();
       return await this.jiraService.transitionTo(credentials, key, statusName);

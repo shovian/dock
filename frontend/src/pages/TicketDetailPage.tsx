@@ -26,6 +26,7 @@ import { SAVE_DEMO_LINK, SEND_TO_DISCORD, CHECK_CONFLICTS } from '../graphql/mut
 import { PRBadge } from '../components/PRBadge';
 import { ConflictModal } from '../components/ConflictModal';
 import { DiscordPreviewModal } from '../components/DiscordPreviewModal';
+import { useBoardMode } from '../lib/boardMode';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { Toast } from '../components/Toast';
 import { Button, Card, Input, Page } from '../components/ui';
@@ -93,6 +94,7 @@ const TicketDetailPage: React.FC<TicketDetailPageProps> = ({ ticketKey, onBack }
 
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [showDiscordModal, setShowDiscordModal] = useState(false);
+  const board = useBoardMode();
   const [showDependency, setShowDependency] = useState(false);
   const [conflictMessage, setConflictMessage] = useState('');
   const [demoUrl, setDemoUrl] = useState('');
@@ -277,14 +279,15 @@ const TicketDetailPage: React.FC<TicketDetailPageProps> = ({ ticketKey, onBack }
         {renderBackButton()}
         <div className="flex flex-wrap items-center gap-2">
           {ticket.url && <a href={ticket.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-border bg-surface-2 px-3 text-sm font-semibold hover:border-border-glow max-[760px]:h-11"><ExternalLink size={15} aria-hidden="true" />Jira</a>}
-          <Button className="max-[760px]:h-11" onClick={() => void openForTicket(ticket.key)} disabled={openingSession}><MessagesSquare size={15} aria-hidden="true" />{openingSession ? 'Opening...' : 'Session'}</Button>
-          <Button
+          {/* Board mode: no chat session per ticket and no Discord post from DOCK (sous posts the review request). */}
+          {!board && <Button className="max-[760px]:h-11" onClick={() => void openForTicket(ticket.key)} disabled={openingSession}><MessagesSquare size={15} aria-hidden="true" />{openingSession ? 'Opening...' : 'Session'}</Button>}
+          {!board && <Button
             className="border-status-discord bg-status-discord text-white hover:bg-status-discord/80 max-[760px]:h-11"
             title={isCombinedAnnouncement ? `One combined Discord announcement for ${relationTickets.map((item: any) => item.key).join(' + ')}` : 'Send status, PR checks and the demo link to Discord'}
             onClick={handleDiscordBroadcast}
           >
             {isCombinedAnnouncement ? `Broadcast ${relationTickets.length}` : 'Broadcast'}
-          </Button>
+          </Button>}
           <Button
             className="w-9 px-0 max-[760px]:h-11 max-[760px]:w-11"
             aria-label={`Actions for ${ticket.key}`}

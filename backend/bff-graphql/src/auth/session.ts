@@ -1,3 +1,4 @@
+import { boardMode } from '../board-mode';
 import { randomBytes } from 'node:crypto';
 import type { CookieOptions, Request, Response } from 'express';
 
@@ -18,6 +19,8 @@ interface AttemptWindow {
 type PinMode = 'auto' | 'always' | 'disabled';
 
 function pinMode(): PinMode {
+  // Board mode shows a team's board: no host or address is trusted without the PIN.
+  if (boardMode()) return 'always';
   const configured = process.env.DOCK_PIN_MODE?.trim().toLowerCase();
   if (configured === 'always' || configured === 'disabled') return configured;
   return 'auto';

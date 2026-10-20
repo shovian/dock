@@ -2,10 +2,15 @@ export type ReviewDecision = 'changes_requested' | 'approved' | 'none';
 export type ChecksState = 'failing' | 'pending' | 'passing' | 'none';
 export interface PullRequestSignal { reviewDecision: ReviewDecision; checks: ChecksState }
 
+import { requiredApprovals } from '../board-mode';
+
 interface ReviewLike { state?: string; user?: { login?: string } | null }
 
-/** The latest approving or requesting review of each reviewer decides; comments change nothing and a dismissal withdraws that reviewer's vote. */
-export function reviewDecisionOf(reviews: ReviewLike[]): ReviewDecision {
+/**
+ * The latest approving or requesting review of each reviewer decides; comments change nothing and a dismissal withdraws that reviewer's vote.
+ * Approved needs `required` reviewers approving (DOCK_REQUIRED_APPROVALS; two in board mode).
+ */
+export function reviewDecisionOf(reviews: ReviewLike[], required = requiredApprovals()): ReviewDecision {
   const votes = new Map<string, string>();
   for (const review of reviews) {
     const reviewer = review.user?.login || 'unknown';
@@ -15,7 +20,7 @@ export function reviewDecisionOf(reviews: ReviewLike[]): ReviewDecision {
   }
   const standing = [...votes.values()];
   if (standing.includes('CHANGES_REQUESTED')) return 'changes_requested';
-  return standing.includes('APPROVED') ? 'approved' : 'none';
+  return standing.filter((state) => state === 'APPROVED').length >= required ? 'approved' : 'none';
 }
 
 interface CheckRunLike { status?: string; conclusion?: string | null }

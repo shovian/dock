@@ -699,6 +699,8 @@ export const typeDefs = gql`
   type Query {
     authStatus: AuthStatus!
     dockMode: String!
+    "True when DOCK shows a blackboard owned by sous: no cron, no chat answers, no Jira moves, no Discord posts."
+    boardMode: Boolean!
     dashboard: [TicketGroup!]!
     ticketDetail(key: String!): Ticket
     ticketRelationGroup(ticketKey: String!): TicketRelationGroup!
