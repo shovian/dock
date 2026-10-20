@@ -219,6 +219,12 @@ export const typeDefs = gql`
     answeredAt: String
   }
 
+  type BoardBatchResult {
+    confirmed: Int!
+    "Items the owner had already answered; their answer is kept."
+    skipped: [ID!]!
+  }
+
   input BoardAnswerInput {
     ask: Int!
     choice: String
@@ -798,6 +804,8 @@ export const typeDefs = gql`
   type Mutation {
     "Saves the owner's answer to a board item; sous writes it to the board later. A new answer before then replaces the old one."
     answerBoardItem(id: ID!, answers: [BoardAnswerInput!]!): Boolean!
+    "Confirm all except: keeps what sous built for each listed item."
+    confirmBoardItems(ids: [ID!]!): BoardBatchResult!
     lockSession: Boolean!
     saveDemoLink(ticketKey: String!, url: String!): Boolean
     sendToDiscord(ticketKey: String!, customMessage: String, threadId: String, threadName: String): Boolean

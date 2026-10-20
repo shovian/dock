@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { CONFIRM, answerOf, draftKeepsBuilt, draftOf, groupItems, pendingNote, questionsOf, type BoardItem } from '../lib/boardItems';
+import { CONFIRM, answerOf, confirmPlan, draftKeepsBuilt, draftOf, groupItems, pendingNote, questionsOf, type BoardItem } from '../lib/boardItems';
 
 const base = (overrides: Partial<BoardItem>): BoardItem => ({
   id: 'Sprint-25/Data-Table#I-31', epic: 'Sprint-25/Data-Table', kind: 'issue', ref: 'I-31', title: 'Ikon arrow-up', tickets: ['QRD-1205'],
@@ -46,4 +46,19 @@ test('items group by ticket, escalated groups first', () => {
     base({ id: 'E#D-4', ref: 'D-4', tickets: [], epic: 'Sprint-25/Sous-Kit' }),
   ]);
   assert.deepStrictEqual(groups.map((group) => [group.key, group.items.map((item) => item.ref)]), [['QRD-2', ['I-2']], ['QRD-1', ['D-1', 'D-3']], ['Sprint-25/Sous-Kit', ['D-4']]]);
+});
+
+test('confirm all except leaves excepted and already answered items out', () => {
+  const items = [
+    base({ id: 'E#D-1', ref: 'D-1' }),
+    base({ id: 'E#D-2', ref: 'D-2' }),
+    base({ id: 'E#D-3', ref: 'D-3', pending: [{ ask: 0, choice: 'b', text: null }], keepsBuilt: false }),
+  ];
+  assert.deepStrictEqual(confirmPlan(items, new Set(['E#D-2'])), { ids: ['E#D-1'], kept: 1, answered: 1 });
+  assert.deepStrictEqual(confirmPlan(items, new Set()), { ids: ['E#D-1', 'E#D-2'], kept: 0, answered: 1 });
+});
+
+test('an issue without asks asks to accept the current approach', () => {
+  const [question] = questionsOf(base({ asks: [] }));
+  assert.deepStrictEqual([question.question, question.options[0].label], ['Accept the approach sous built or assumed?', 'Accept']);
 });

@@ -441,3 +441,9 @@ export const ANSWER_BOARD_ITEM = gql`
     answerBoardItem(id: $id, answers: $answers)
   }
 `;
+
+export const CONFIRM_BOARD_ITEMS = gql`
+  mutation ConfirmBoardItems($ids: [ID!]!) {
+    confirmBoardItems(ids: $ids) { confirmed skipped }
+  }
+`;
