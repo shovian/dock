@@ -74,11 +74,12 @@ const BugReportsPage: React.FC = () => {
       setRefreshNote(failure instanceof Error ? failure.message : 'The refresh did not start');
     }
   };
-  const dismissThread = async (id: string) => {
+  // The dismissal names the activity this page shows, so a message that arrived after the last fetch keeps the thread listed.
+  const dismissThread = async ({ id, lastActivity }: BoardThread) => {
     setDismissError(null);
     setDismissing((current) => new Set(current).add(id));
     try {
-      await dismiss({ variables: { id } });
+      await dismiss({ variables: { id, lastActivity } });
       await refetch();
     } catch (failure) {
       setDismissError(failure instanceof Error ? failure.message : 'The thread was not dismissed');
@@ -87,7 +88,7 @@ const BugReportsPage: React.FC = () => {
     }
   };
   const renderRow = (row: BoardThread) => (
-    <ThreadRow key={row.id} thread={row} now={now} dismissing={dismissing.has(row.id)} onDismiss={() => void dismissThread(row.id)} />
+    <ThreadRow key={row.id} thread={row} now={now} dismissing={dismissing.has(row.id)} onDismiss={() => void dismissThread(row)} />
   );
 
   return (

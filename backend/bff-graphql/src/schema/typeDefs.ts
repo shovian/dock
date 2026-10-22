@@ -855,8 +855,8 @@ export const typeDefs = gql`
     answerBoardItem(id: ID!, answers: [BoardAnswerInput!]!): Boolean!
     "Confirm all except: keeps what sous built for each listed item."
     confirmBoardItems(ids: [ID!]!): BoardBatchResult!
-    "Hides a Discord thread until it has a new message. False when the thread is not open."
-    dismissBoardThread(id: String!): Boolean!
+    "Hides a Discord thread until it has a new message. lastActivity is the one the page showed (ISO date), so a message that arrived after the page loaded is never hidden unseen. False when the thread is not open."
+    dismissBoardThread(id: String!, lastActivity: String!): Boolean!
     "Starts sous discord-sync unless it already runs; does not wait for it."
     refreshBoardThreads: BoardThreadRefresh!
     lockSession: Boolean!

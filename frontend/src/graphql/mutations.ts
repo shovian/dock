@@ -449,8 +449,8 @@ export const CONFIRM_BOARD_ITEMS = gql`
 `;
 
 export const DISMISS_BOARD_THREAD = gql`
-  mutation DismissBoardThread($id: String!) {
-    dismissBoardThread(id: $id)
+  mutation DismissBoardThread($id: String!, $lastActivity: String!) {
+    dismissBoardThread(id: $id, lastActivity: $lastActivity)
   }
 `;
 

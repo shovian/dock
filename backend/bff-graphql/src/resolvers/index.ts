@@ -1,6 +1,6 @@
 import { boardMode, refuseInBoardMode } from '../board-mode';
 import { BoardInputError, boardService } from '../integrations/board';
-import { threadService } from '../integrations/board-threads';
+import { ThreadInputError, threadService } from '../integrations/board-threads';
 import { threadRefresher } from '../integrations/board-threads-refresh';
 import { JiraAPI, JiraTicketLookupError } from '../datasources/JiraAPI';
 import { GitHubAPI } from '../datasources/GitHubAPI';
@@ -35,7 +35,7 @@ const storageAPI = new StorageAPI();
 const isPresent = <T>(value: T | null | undefined): value is T => value != null;
 
 function orchestratorInputError(error: unknown): never {
-  if (error instanceof OrchestratorInputError || error instanceof BoardInputError) {
+  if (error instanceof OrchestratorInputError || error instanceof BoardInputError || error instanceof ThreadInputError) {
     throw new GraphQLError(error.message, { extensions: { code: 'BAD_USER_INPUT' } });
   }
   throw error;
@@ -331,7 +331,7 @@ export const resolvers = {
   Mutation: {
     answerBoardItem: (_: unknown, { id, answers }: { id: string; answers: unknown }) => boardService.answer(id, answers).catch(orchestratorInputError),
     confirmBoardItems: (_: unknown, { ids }: { ids: unknown }) => boardService.confirmAll(ids).catch(orchestratorInputError),
-    dismissBoardThread: async (_: unknown, { id }: { id: string }) => (boardMode() ? threadService.dismiss(id) : false),
+    dismissBoardThread: async (_: unknown, { id, lastActivity }: { id: string; lastActivity: string }) => (boardMode() ? threadService.dismiss(id, lastActivity).catch(orchestratorInputError) : false),
     refreshBoardThreads: async () => threadRefresher.start(),
     lockSession: async (_: unknown, __: unknown, context: AuthContext) => {
       context.sessions.clear(context.request, context.response);

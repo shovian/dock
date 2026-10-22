@@ -169,11 +169,16 @@ export class ThreadService {
     return { rows, syncedAt: synced?.syncedAt ?? null, jiraSnapshotAt: synced?.jiraSnapshotAt ?? null };
   }
 
-  /** Hides a thread until its lastActivity changes. False when the thread is not open. */
-  async dismiss(id: string, now = new Date()) {
+  /**
+   * Hides a thread until its lastActivity changes. `lastActivity` is the one the owner saw on the page, not the server's
+   * current one: a sync that lands between the page's last fetch and the click must not dismiss a message nobody read,
+   * so the thread comes back on its own when the server's lastActivity differs. False when the thread is not open.
+   */
+  async dismiss(id: string, lastActivity: string, now = new Date()) {
+    const seen = instant(lastActivity, 'lastActivity');
     const row = (await this.store.rows()).find((entry) => entry.id === id && entry.id !== META_ID && !entry.removedAt);
     if (!row) return false;
-    await this.store.addDismissal(id, row.lastActivity, now);
+    await this.store.addDismissal(id, seen, now);
     return true;
   }
 }

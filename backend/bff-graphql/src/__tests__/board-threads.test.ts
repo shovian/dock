@@ -110,14 +110,36 @@ test('a rejected payload changes nothing', async () => {
 test('dismiss hides a row until its lastActivity changes', async () => {
   const service = new ThreadService(memoryStore());
   await service.ingest(payload([row('1'), row('2')]), 'sous');
-  assert.strictEqual(await service.dismiss('1', new Date('2026-10-22T11:00:00Z')), true);
-  assert.strictEqual(await service.dismiss('999'), false, 'an unknown thread cannot be dismissed');
+  assert.strictEqual(await service.dismiss('1', '2026-10-02T09:00:00+00:00', new Date('2026-10-22T11:00:00Z')), true);
+  assert.strictEqual(await service.dismiss('999', '2026-10-02T09:00:00+00:00'), false, 'an unknown thread cannot be dismissed');
   const dismissedOf = async (id: string) => (await service.list()).rows.find((entry) => entry.id === id)!.dismissed;
   assert.deepStrictEqual([await dismissedOf('1'), await dismissedOf('2')], [true, false]);
   await service.ingest(payload([row('1'), row('2')]), 'sous');
   assert.strictEqual(await dismissedOf('1'), true, 'the same lastActivity keeps it dismissed');
   await service.ingest(payload([row('1', { lastActivity: '2026-10-22T10:30:00+00:00' }), row('2')]), 'sous');
   assert.strictEqual(await dismissedOf('1'), false, 'a new message brings it back');
+});
+
+test('dismiss binds to the lastActivity the owner saw, not the one the server has now', async () => {
+  const service = new ThreadService(memoryStore());
+  await service.ingest(payload([row('1')]), 'sous');            // the page shows lastActivity 2026-10-02T09:00
+  await service.ingest(payload([row('1', { lastActivity: '2026-10-02T09:30:00+00:00' })]), 'sous');   // a sync lands before the click
+  assert.strictEqual(await service.dismiss('1', '2026-10-02T09:00:00.000Z'), true, 'the thread is open, so the dismissal is accepted');
+  const [entry] = (await service.list()).rows;
+  assert.strictEqual(entry.dismissed, false, 'but the unseen message keeps the thread visible');
+  assert.strictEqual(await service.dismiss('1', entry.lastActivity), true);
+  assert.strictEqual((await service.list()).rows[0].dismissed, true, 'dismissing what was seen works');
+});
+
+test('dismiss refuses a lastActivity that is not a timestamp and stores nothing', async () => {
+  const store = memoryStore();
+  const service = new ThreadService(store);
+  await service.ingest(payload([row('1')]), 'sous');
+  for (const bad of ['', 'yesterday', undefined, 42, null]) {
+    await assert.rejects(service.dismiss('1', bad as never), ThreadInputError);
+  }
+  assert.strictEqual(store.dismissals.size, 0);
+  assert.strictEqual((await service.list()).rows[0].dismissed, false);
 });
 
 test('the store lists open rows only, so list, ingest and dismiss never load removed ones', async () => {
@@ -131,9 +153,9 @@ test('a removed row that comes back is listed again and can be dismissed', async
   const service = new ThreadService(memoryStore());
   await service.ingest(payload([row('1'), row('2')]), 'sous');
   await service.ingest(payload([row('2')]), 'sous');
-  assert.strictEqual(await service.dismiss('1'), false, 'a removed row is not open');
+  assert.strictEqual(await service.dismiss('1', '2026-10-02T09:00:00+00:00'), false, 'a removed row is not open');
   assert.deepStrictEqual(await service.ingest(payload([row('1'), row('2')]), 'sous'), { rows: 2, removed: 0 });
-  assert.strictEqual(await service.dismiss('1'), true);
+  assert.strictEqual(await service.dismiss('1', '2026-10-02T09:00:00+00:00'), true);
 });
 
 test('list returns syncedAt and jiraSnapshotAt from the last ingest, and never the meta row', async () => {
