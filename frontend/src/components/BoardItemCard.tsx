@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useMutation } from '@apollo/client';
 import { ExternalLink } from 'lucide-react';
 import { ANSWER_BOARD_ITEM } from '../graphql/mutations';
-import { Badge, Button, Card, Textarea } from './ui';
+import { Badge, Button, Card, Checkbox, Textarea } from './ui';
 import { cn } from '../lib/cn';
 import { answerOf, draftKeepsBuilt, draftOf, pendingNote, questionsOf, type BoardItem, type Draft } from '../lib/boardItems';
 
@@ -13,7 +13,10 @@ const MAX_TEXT = 2000;
  * so this is a confirm-or-change card, not a question that blocks a session: the answer is kept until
  * sous writes it to the board.
  */
-export const BoardItemCard: React.FC<{ item: BoardItem; onSaved: () => void }> = ({ item, onSaved }) => {
+/** While "Confirm all except" is open: the card's except box. */
+export interface BoardExcept { checked: boolean; onToggle: () => void }
+
+export const BoardItemCard: React.FC<{ item: BoardItem; onSaved: () => void; except?: BoardExcept }> = ({ item, onSaved, except }) => {
   const [draft, setDraft] = useState<Draft>(() => draftOf(item));
   const [error, setError] = useState<string | null>(null);
   const [answer, { loading }] = useMutation(ANSWER_BOARD_ITEM);
@@ -37,6 +40,16 @@ export const BoardItemCard: React.FC<{ item: BoardItem; onSaved: () => void }> =
 
   return (
     <Card className={cn('flex flex-col gap-3', item.escalated ? 'border-amber-300/50' : 'border-border')} aria-label={`${item.ref}: ${item.title}`}>
+      {except && (
+        item.pending
+          ? <p className="text-xs text-muted-foreground">Already answered: left as it is.</p>
+          : (
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Checkbox checked={except.checked} onChange={except.onToggle} aria-label={`Except ${item.ref}: keep it open`} />
+              Except this one (keep it open)
+            </label>
+          )
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={item.kind === 'issue' ? 'warn' : 'accent'}>{item.ref}</Badge>
         {item.type && <Badge>{item.type}</Badge>}

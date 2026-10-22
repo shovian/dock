@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { AlertTriangle, Bot, ExternalLink, GitMerge, Hand } from 'lucide-react';
 import { GET_BOARD_ITEMS, GET_NEEDS_ATTENTION } from '../graphql/queries';
-import { CHECK_CONFLICTS } from '../graphql/mutations';
+import { CHECK_CONFLICTS, CONFIRM_BOARD_ITEMS } from '../graphql/mutations';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
 import { AllClearScene } from '../components/empty/scenes/AllClearScene';
@@ -12,7 +12,7 @@ import { Badge, Button, Card, Page } from '../components/ui';
 import { CACHED_QUERY_OPTIONS, isInitialQueryLoading } from '../lib/queryPolicy';
 import { cn } from '../lib/cn';
 import { useBoardMode } from '../lib/boardMode';
-import { groupItems, type BoardItem } from '../lib/boardItems';
+import { confirmPlan, groupItems, type BoardItem } from '../lib/boardItems';
 import { BoardItemCard } from '../components/BoardItemCard';
 
 interface NeedsAttentionPageProps { onTicketClick: (key: string) => void }
@@ -24,6 +24,10 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
   const board = useBoardMode();
   const boardQuery = useQuery(GET_BOARD_ITEMS, { ...CACHED_QUERY_OPTIONS, pollInterval: 30000, skip: !board });
   const [checkConflicts] = useMutation(CHECK_CONFLICTS);
+  const [confirmBoardItems, { loading: confirming }] = useMutation(CONFIRM_BOARD_ITEMS);
+  // "Confirm all except": the scope ('all' or a ticket key) and the items the owner keeps open.
+  const [batchScope, setBatchScope] = useState<string | null>(null);
+  const [excepted, setExcepted] = useState<Set<string>>(new Set());
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictMessage, setConflictMessage] = useState('');
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
@@ -35,6 +39,26 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
   const items = (data?.needsAttention || []).filter((item: any) => !(board && item.type === 'AGENT_WAITING'));
   const boardItems: BoardItem[] = boardQuery.data?.boardItems || [];
   const boardGroups = groupItems(boardItems);
+  const inBatch = (groupKey: string) => batchScope === 'all' || batchScope === groupKey;
+  const batchItems = batchScope === 'all' ? boardItems : boardGroups.find((group) => group.key === batchScope)?.items ?? [];
+  const plan = confirmPlan(batchItems, excepted);
+  const startBatch = (scope: string) => { setBatchScope(scope); setExcepted(new Set()); };
+  const toggleExcept = (id: string) => setExcepted((current) => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const runBatch = async () => {
+    try {
+      const res = await confirmBoardItems({ variables: { ids: plan.ids } });
+      const { confirmed, skipped } = res.data?.confirmBoardItems ?? { confirmed: 0, skipped: [] };
+      setToast({ message: `Confirmed ${confirmed}${skipped.length ? `, ${skipped.length} already answered` : ''}. sous writes them to the board on its next \`sous answer\`.`, type: 'success' });
+      setBatchScope(null);
+      await boardQuery.refetch();
+    } catch (failure) {
+      setToast({ message: failure instanceof Error ? failure.message : 'Confirm failed', type: 'error' });
+    }
+  };
   const handleInspectConflict = async (owner: string, repo: string, pullNumber: number) => {
     try {
       const res = await checkConflicts({ variables: { owner, repo, pullNumber } });
@@ -58,14 +82,38 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
 
       {board && boardGroups.length > 0 && (
         <section className="mb-8 flex flex-col gap-6" aria-label="On the board">
+          <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="font-display text-xl font-bold">On the board</h2>
             <p className="mt-1 text-pretty text-sm text-secondary-foreground">Issues waiting on you and decisions sous made on your behalf. The work already continued on the option marked built: confirm it, or pick another and the ticket gets a revision.</p>
           </div>
+          {batchScope === null && <Button size="sm" onClick={() => startBatch('all')}>Confirm all except…</Button>}
+          </div>
+          {batchScope !== null && (
+            <Card className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-3 border-border-glow" role="region" aria-label="Confirm all except">
+              <p className="text-sm">
+                <b>{plan.ids.length}</b> will be confirmed as built{batchScope !== 'all' ? ` for ${batchScope}` : ''} · <b>{plan.kept}</b> kept open{plan.answered ? ` · ${plan.answered} already answered` : ''}. Tick the ones to keep open.
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => setBatchScope(null)}>Cancel</Button>
+                <Button size="sm" variant="primary" disabled={confirming || plan.ids.length === 0} onClick={() => void runBatch()}>{confirming ? 'Confirming…' : `Confirm ${plan.ids.length}`}</Button>
+              </div>
+            </Card>
+          )}
           {boardGroups.map((group) => (
             <div key={group.key} className="flex flex-col gap-3">
-              <h3 className="font-mono text-sm font-bold">{group.key} <span className="font-normal text-muted-foreground">· {group.epic} · {group.items.length}</span></h3>
-              {group.items.map((item) => <BoardItemCard key={item.id} item={item} onSaved={() => void boardQuery.refetch()} />)}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-mono text-sm font-bold">{group.key} <span className="font-normal text-muted-foreground">· {group.epic} · {group.items.length}</span></h3>
+                {batchScope === null && group.items.length > 1 && <Button size="sm" variant="ghost" onClick={() => startBatch(group.key)}>Confirm all except…</Button>}
+              </div>
+              {group.items.map((item) => (
+                <BoardItemCard
+                  key={item.id}
+                  item={item}
+                  onSaved={() => void boardQuery.refetch()}
+                  except={inBatch(group.key) ? { checked: excepted.has(item.id), onToggle: () => toggleExcept(item.id) } : undefined}
+                />
+              ))}
             </div>
           ))}
         </section>

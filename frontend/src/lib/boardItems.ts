@@ -35,7 +35,9 @@ export type Draft = DraftPart[];
 /** The questions a card shows: the item's asks, or a single confirm/change question for a decision without asks. */
 export function questionsOf(item: BoardItem): BoardAsk[] {
   if (item.asks.length) return item.asks;
-  return [{ question: 'Keep this decision?', options: [{ key: CONFIRM, label: 'Confirm', effect: 'nothing changes', built: true }] }];
+  // An issue without asks: accepting means the work stays on the approach sous built or assumed.
+  const question = item.kind === 'decision' ? 'Keep this decision?' : 'Accept the approach sous built or assumed?';
+  return [{ question, options: [{ key: CONFIRM, label: item.kind === 'decision' ? 'Confirm' : 'Accept', effect: 'nothing changes', built: true }] }];
 }
 
 /** A new draft, or the pending answer when the owner already answered. */
@@ -92,4 +94,11 @@ export function pendingNote(item: BoardItem): string | null {
   return item.keepsBuilt
     ? 'Answer saved: keeps what sous built. sous writes it to the board on its next `sous answer`.'
     : 'Answer saved: differs from what sous built, so the ticket gets a revision. sous writes it to the board on its next `sous answer`.';
+}
+
+/** "Confirm all except": the items to confirm (not excepted, not already answered) and the counts the bar shows. */
+export function confirmPlan(items: BoardItem[], excepted: ReadonlySet<string>) {
+  const answered = items.filter((item) => item.pending);
+  const ids = items.filter((item) => !item.pending && !excepted.has(item.id)).map((item) => item.id);
+  return { ids, kept: items.length - answered.length - ids.length, answered: answered.length };
 }

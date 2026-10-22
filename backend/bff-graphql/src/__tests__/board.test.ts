@@ -116,3 +116,22 @@ test('escalated items come first', async () => {
   await board.ingest({ items: [shov, issue] }, 'sous');
   assert.deepStrictEqual((await board.list()).map((item) => item.ref), ['I-31', 'D-36']);
 });
+
+test('confirm all except: keeps what was built for the listed items, leaves answered ones alone, checks every id first', async () => {
+  const store = memoryStore();
+  const board = new BoardService(store);
+  const other = { ...shov, id: 'Sprint-25/Data-Table#D-37', title: 'Another' };
+  await board.ingest({ items: [issue, shov, other] }, 'sous');
+  await board.answer('Sprint-25/Data-Table#D-37', [{ ask: 0, text: 'ganti ini' }]);
+
+  await assert.rejects(board.confirmAll(['Sprint-25/Data-Table#I-31', 'Sprint-25/Data-Table#D-99']), /No longer open: Sprint-25\/Data-Table#D-99/);
+  assert.strictEqual(store.answerRows.length, 1, 'nothing is written when one id is wrong');
+
+  assert.deepStrictEqual(await board.confirmAll(['Sprint-25/Data-Table#I-31', 'Sprint-25/Data-Table#D-36', 'Sprint-25/Data-Table#D-37']), { confirmed: 2, skipped: ['Sprint-25/Data-Table#D-37'] });
+  const views = new Map((await board.list()).map((item) => [item.ref, item]));
+  assert.deepStrictEqual(views.get('I-31')!.pending, [{ ask: 0, choice: 'a', text: null }]);
+  assert.deepStrictEqual(views.get('D-36')!.pending, [{ ask: 0, choice: CONFIRM, text: null }]);
+  assert.deepStrictEqual(views.get('D-37')!.pending, [{ ask: 0, choice: null, text: 'ganti ini' }], 'an earlier answer is kept');
+  assert.strictEqual(views.get('I-31')!.keepsBuilt, true);
+  await assert.rejects(board.confirmAll([]), /ids/);
+});

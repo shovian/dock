@@ -134,6 +134,12 @@ export function parseAnswer(item: BoardItem, value: unknown): BoardAnswerPart[] 
   return parts.sort((a, b) => a.ask - b.ask);
 }
 
+/** The answer that keeps what sous built: the built option of every ask, or confirm for a decision without asks. */
+export function builtAnswer(item: BoardItem): BoardAnswerPart[] {
+  if (!item.asks.length) return [{ ask: 0, choice: CONFIRM, text: null }];
+  return item.asks.map((ask, index) => ({ ask: index, choice: ask.options.find((option) => option.built)!.key, text: null }));
+}
+
 /** True when the answer keeps everything sous built, so no revision is needed. */
 export function keepsBuilt(item: BoardItem, parts: BoardAnswerPart[]): boolean {
   return parts.every((part) => (item.asks.length
@@ -193,6 +199,25 @@ export class BoardService {
     if (pending) await this.store.updateAnswer(pending.id, payload, now);
     else await this.store.addAnswer(itemId, row.machine, payload, now);
     return true;
+  }
+
+  /**
+   * "Confirm all except": keeps what sous built for every listed item. Every id is checked before anything is written.
+   * An item the owner already answered is left as it is and reported as skipped.
+   */
+  async confirmAll(ids: unknown, now = new Date()) {
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_ITEMS || !ids.every((id) => typeof id === 'string')) throw new BoardInputError('Send the ids to confirm');
+    const unique = [...new Set(ids as string[])];
+    const open = new Map((await this.store.items()).filter((row) => !row.removedAt).map((row) => [row.id, row]));
+    const missing = unique.filter((id) => !open.has(id));
+    if (missing.length) throw new BoardInputError(`No longer open: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` and ${missing.length - 5} more` : ''}`);
+    const answered = new Set((await this.store.answers({ pendingOnly: true })).map((row) => row.itemId));
+    const skipped = unique.filter((id) => answered.has(id));
+    for (const id of unique.filter((entry) => !answered.has(entry))) {
+      const row = open.get(id)!;
+      await this.store.addAnswer(id, row.machine, JSON.stringify(builtAnswer(JSON.parse(row.payload) as BoardItem)), now);
+    }
+    return { confirmed: unique.length - skipped.length, skipped };
   }
 
   /** What `sous answer` applies: each pending answer with its item, for the producer that owns the items. */

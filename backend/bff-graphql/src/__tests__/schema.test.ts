@@ -140,6 +140,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
       'clearDemoStorage',
       'clearTicketDependency',
       'clearTicketWorkOrder',
+      'confirmBoardItems',
       'confirmOrchestration',
       'createChatSession',
       'createIngestToken',

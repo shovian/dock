@@ -322,6 +322,7 @@ export const resolvers = {
 
   Mutation: {
     answerBoardItem: (_: unknown, { id, answers }: { id: string; answers: unknown }) => boardService.answer(id, answers).catch(orchestratorInputError),
+    confirmBoardItems: (_: unknown, { ids }: { ids: unknown }) => boardService.confirmAll(ids).catch(orchestratorInputError),
     lockSession: async (_: unknown, __: unknown, context: AuthContext) => {
       context.sessions.clear(context.request, context.response);
       return true;
@@ -593,6 +594,7 @@ export const protectedQueries = [
 ] as const;
 export const protectedMutations = [
   'answerBoardItem',
+  'confirmBoardItems',
   'saveDemoLink',
   'sendToDiscord',
   'setTicketDependency',
