@@ -60,7 +60,7 @@ test('ThreadRefresher', async (t) => {
   await t.test('non-zero exit is reported as lastError, success clears it', async () => {
     const fake = fakeRun();
     const refresher = new ThreadRefresher(fake.run, '/invented/bin/sous', 4123, BOARD);
-    for (const [code, message] of [[2, 'fetch failed, list unchanged'], [1, 'DOCK refused the update'], [7, 'sync failed (exit 7)']] as const) {
+    for (const [code, message] of [[2, 'fetch failed, list unchanged'], [1, 'DOCK refused the update'], [3, 'a sync is already running'], [7, 'sync failed (exit 7)']] as const) {
       refresher.start();
       fake.finish.at(-1)!.resolve({ code, output: 'invented output with /invented/secret-token' });
       await settle();

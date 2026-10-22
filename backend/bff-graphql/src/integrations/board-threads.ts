@@ -119,6 +119,10 @@ export function parseThread(value: unknown): ThreadRow {
 export interface ThreadRecord { id: string; machine: string; payload: string; lastActivity: Date; updatedAt: Date; removedAt: Date | null }
 
 export interface ThreadStore {
+  /**
+   * Open rows only (removedAt null; the meta row included). Nothing needs a removed row: ingest reaches one again through
+   * upsertRow, which clears removedAt without reading it first.
+   */
   rows(): Promise<ThreadRecord[]>;
   upsertRow(id: string, machine: string, payload: string, lastActivity: Date, now: Date): Promise<void>;
   removeRows(ids: string[], now: Date): Promise<void>;
@@ -176,7 +180,7 @@ export class ThreadService {
 
 export function prismaThreadStore(db: PrismaClient): ThreadStore {
   return {
-    rows: () => db.boardThread.findMany(),
+    rows: () => db.boardThread.findMany({ where: { removedAt: null } }),
     upsertRow: async (id, machine, payload, lastActivity, now) => {
       await db.boardThread.upsert({ where: { id }, create: { id, machine, payload, lastActivity, updatedAt: now }, update: { machine, payload, lastActivity, updatedAt: now, removedAt: null } });
     },

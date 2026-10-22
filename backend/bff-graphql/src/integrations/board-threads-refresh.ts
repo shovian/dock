@@ -28,7 +28,7 @@ export const execRun: RunScript = (cmd, args, env) => new Promise((resolve, reje
   });
 });
 
-const EXIT_MESSAGES: Record<number, string> = { 1: 'DOCK refused the update', 2: 'fetch failed, list unchanged' };
+const EXIT_MESSAGES: Record<number, string> = { 1: 'DOCK refused the update', 2: 'fetch failed, list unchanged', 3: 'a sync is already running' };
 
 export class ThreadRefresher {
   private running = false;

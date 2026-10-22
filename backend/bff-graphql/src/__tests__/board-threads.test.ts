@@ -5,7 +5,7 @@ import test from 'node:test';
 import express from 'express';
 import { PinRateLimiter } from '../auth/session';
 import { OrchestratorService } from '../integrations/orchestrator';
-import { MAX_ROWS, THREAD_STATES, ThreadInputError, ThreadService, parseThread, type ThreadRow, type ThreadRecord, type ThreadStore } from '../integrations/board-threads';
+import { MAX_ROWS, THREAD_STATES, ThreadInputError, ThreadService, parseThread, prismaThreadStore, type ThreadRow, type ThreadRecord, type ThreadStore } from '../integrations/board-threads';
 import { createOrchestratorIngestRouter } from '../routes/orchestrator';
 
 function memoryStore(): ThreadStore & { records: ThreadRecord[]; dismissals: Map<string, Date> } {
@@ -14,7 +14,8 @@ function memoryStore(): ThreadStore & { records: ThreadRecord[]; dismissals: Map
   return {
     records,
     dismissals,
-    rows: async () => records.map((row) => ({ ...row })),
+    // The store contract: rows() lists open rows (removedAt null) only; a removed row is reached again only through upsertRow.
+    rows: async () => records.filter((row) => !row.removedAt).map((row) => ({ ...row })),
     upsertRow: async (id, machine, payload, lastActivity, now) => {
       const row = records.find((entry) => entry.id === id);
       if (row) Object.assign(row, { machine, payload, lastActivity, updatedAt: now, removedAt: null });
@@ -117,6 +118,22 @@ test('dismiss hides a row until its lastActivity changes', async () => {
   assert.strictEqual(await dismissedOf('1'), true, 'the same lastActivity keeps it dismissed');
   await service.ingest(payload([row('1', { lastActivity: '2026-10-22T10:30:00+00:00' }), row('2')]), 'sous');
   assert.strictEqual(await dismissedOf('1'), false, 'a new message brings it back');
+});
+
+test('the store lists open rows only, so list, ingest and dismiss never load removed ones', async () => {
+  const asked: unknown[] = [];
+  const store = prismaThreadStore({ boardThread: { findMany: async (args: unknown) => { asked.push(args); return []; } } } as never);
+  await store.rows();
+  assert.deepStrictEqual(asked, [{ where: { removedAt: null } }]);
+});
+
+test('a removed row that comes back is listed again and can be dismissed', async () => {
+  const service = new ThreadService(memoryStore());
+  await service.ingest(payload([row('1'), row('2')]), 'sous');
+  await service.ingest(payload([row('2')]), 'sous');
+  assert.strictEqual(await service.dismiss('1'), false, 'a removed row is not open');
+  assert.deepStrictEqual(await service.ingest(payload([row('1'), row('2')]), 'sous'), { rows: 2, removed: 0 });
+  assert.strictEqual(await service.dismiss('1'), true);
 });
 
 test('list returns syncedAt and jiraSnapshotAt from the last ingest, and never the meta row', async () => {
