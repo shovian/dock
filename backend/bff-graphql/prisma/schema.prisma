@@ -352,3 +352,23 @@ model BoardAnswer {
   @@index([machine, appliedAt])
   @@index([itemId])
 }
+
+/// A Discord forum thread, sorted by `sous discord-sync`. The full set is sent each time: a thread that is no longer sent gets removedAt.
+/// The row `__meta__` keeps when the last sync ran and the age of the Jira snapshot it used.
+model BoardThread {
+  id           String    @id
+  machine      String
+  payload      String
+  lastActivity DateTime
+  updatedAt    DateTime
+  removedAt    DateTime?
+
+  @@index([machine])
+}
+
+/// The owner dismissed a thread. It holds only while the thread's lastActivity is the one that was dismissed.
+model BoardThreadDismissal {
+  threadId     String   @id
+  lastActivity DateTime
+  createdAt    DateTime
+}

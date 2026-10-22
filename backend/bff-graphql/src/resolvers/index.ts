@@ -1,5 +1,7 @@
 import { boardMode, refuseInBoardMode } from '../board-mode';
 import { BoardInputError, boardService } from '../integrations/board';
+import { ThreadInputError, threadService } from '../integrations/board-threads';
+import { threadRefresher } from '../integrations/board-threads-refresh';
 import { JiraAPI, JiraTicketLookupError } from '../datasources/JiraAPI';
 import { GitHubAPI } from '../datasources/GitHubAPI';
 import { DiscordAPI } from '../datasources/DiscordAPI';
@@ -33,7 +35,7 @@ const storageAPI = new StorageAPI();
 const isPresent = <T>(value: T | null | undefined): value is T => value != null;
 
 function orchestratorInputError(error: unknown): never {
-  if (error instanceof OrchestratorInputError || error instanceof BoardInputError) {
+  if (error instanceof OrchestratorInputError || error instanceof BoardInputError || error instanceof ThreadInputError) {
     throw new GraphQLError(error.message, { extensions: { code: 'BAD_USER_INPUT' } });
   }
   throw error;
@@ -171,6 +173,12 @@ export const resolvers = {
       return storageAPI.getTicketRelationGroup(ticketKey);
     },
     boardItems: () => boardService.list(),
+    // Bug Reports exist only in board mode; elsewhere the page is simply empty.
+    boardThreads: async () => {
+      if (!boardMode()) return { rows: [], syncedAt: null, jiraSnapshotAt: null, refreshing: false, refreshError: null };
+      const { running, lastError } = threadRefresher.status();
+      return { ...(await threadService.list()), refreshing: running, refreshError: lastError };
+    },
     needsAttention: async () => {
       const [agentItems, pullRequestItems] = await Promise.all([
         orchestratorService.needsAttention().catch((error) => {
@@ -323,6 +331,8 @@ export const resolvers = {
   Mutation: {
     answerBoardItem: (_: unknown, { id, answers }: { id: string; answers: unknown }) => boardService.answer(id, answers).catch(orchestratorInputError),
     confirmBoardItems: (_: unknown, { ids }: { ids: unknown }) => boardService.confirmAll(ids).catch(orchestratorInputError),
+    dismissBoardThread: async (_: unknown, { id, lastActivity }: { id: string; lastActivity: string }) => (boardMode() ? threadService.dismiss(id, lastActivity).catch(orchestratorInputError) : false),
+    refreshBoardThreads: async () => threadRefresher.start(),
     lockSession: async (_: unknown, __: unknown, context: AuthContext) => {
       context.sessions.clear(context.request, context.response);
       return true;
@@ -586,7 +596,7 @@ export const resolvers = {
 };
 
 export const protectedQueries = [
-  'dashboard', 'ticketDetail', 'ticketRelationGroup', 'needsAttention', 'boardItems', 'jiraProjects', 'githubRepos', 'quickLinks', 'calendarEvents', 'monitors',
+  'dashboard', 'ticketDetail', 'ticketRelationGroup', 'needsAttention', 'boardItems', 'boardThreads', 'jiraProjects', 'githubRepos', 'quickLinks', 'calendarEvents', 'monitors',
   'dockerRuntime', 'dockerContainerLogs', 'orchestrations', 'orchestration', 'ingestTokens', 'elevenLabsKeys', 'devServers', 'devServerLog', 'demoVideos', 'demoStorage',
   'chatSessions', 'chatSession', 'chatMessages', 'chatActivity', 'chatSessionWorkers', 'chatActivityDetail', 'chatSearch', 'chatBridge', 'chatMachines', 'chatStatus', 'chatBalloons',
   'chatCommands', 'chatMachineOptions',
@@ -595,6 +605,8 @@ export const protectedQueries = [
 export const protectedMutations = [
   'answerBoardItem',
   'confirmBoardItems',
+  'dismissBoardThread',
+  'refreshBoardThreads',
   'saveDemoLink',
   'sendToDiscord',
   'setTicketDependency',

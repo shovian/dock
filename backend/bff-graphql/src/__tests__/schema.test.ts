@@ -83,6 +83,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
       'authStatus',
       'boardItems',
       'boardMode',
+      'boardThreads',
       'calendarEvents',
       'chatActivity',
       'chatActivityDetail',
@@ -147,9 +148,11 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
       'deleteChatSession',
       'deleteDemoVideo',
       'disconnectGoogleCalendar',
+      'dismissBoardThread',
       'dismissOrchestration',
       'lockSession',
       'moveOrchestration',
+      'refreshBoardThreads',
       'refreshData',
       'refreshSprintDashboard',
       'removeElevenLabsKey',
@@ -215,6 +218,12 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
     }
   });
 
+  await t.test('should make dismissBoardThread name the activity the owner saw', () => {
+    const field = (buildASTSchema(typeDefs).getMutationType() as GraphQLObjectType).getFields().dismissBoardThread;
+    assert.deepStrictEqual(field.args.map((arg) => `${arg.name}: ${String(arg.type)}`), ['id: String!', 'lastActivity: String!']);
+    assert.strictEqual(String(field.type), 'Boolean!');
+  });
+
   await t.test('should expose machine identity and hand-over fields additively', () => {
     const schema = buildASTSchema(typeDefs);
     const field = (type: string, name: string) => (schema.getType(type) as any).getFields()[name];
@@ -238,6 +247,10 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
       ['ChatInteraction', 'answeredAt', 'String'],
       ['ChatModel', 'efforts', '[String!]!'],
       ['ChatMachineOptions', 'fastAvailable', 'Boolean!'],
+      ['BoardThread', 'approvals', 'BoardThreadApprovals'],
+      ['BoardThread', 'slots', 'BoardThreadSlots'],
+      ['BoardThreadSlots', 'have', 'Int!'],
+      ['BoardThreadSlots', 'need', 'Int!'],
     ]) {
       assert.strictEqual(String(field(type, name).type), shape, `${type}.${name}`);
     }

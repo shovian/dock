@@ -7,6 +7,7 @@ import { AppLayout } from './components/AppLayout';
 import DashboardPage from './pages/DashboardPage';
 import TicketDetailPage from './pages/TicketDetailPage';
 import NeedsAttentionPage from './pages/NeedsAttentionPage';
+import BugReportsPage from './pages/BugReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import HomePage from './pages/HomePage';
 import CalendarPage from './pages/CalendarPage';
@@ -51,7 +52,7 @@ function App() {
       const key = decodeURIComponent(path.split('/').pop() || '');
       return { path: '/ticket', key: key || null };
     }
-    if (path === '/dashboard' || path === '/agents' || path === '/sessions' || path === '/calendar' || path === '/sprint' || path === '/monitoring' || path === '/docker' || path === '/demo-videos' || path === '/dev-servers' || path === '/attention' || path === '/settings') {
+    if (path === '/dashboard' || path === '/agents' || path === '/sessions' || path === '/calendar' || path === '/sprint' || path === '/monitoring' || path === '/docker' || path === '/demo-videos' || path === '/dev-servers' || path === '/attention' || path === '/bugs' || path === '/settings') {
       return { path, key: null };
     }
     return { path: '/', key: null };
@@ -100,7 +101,8 @@ function App() {
 
   const mode: DockMode = data?.dockMode === 'workspace' ? 'workspace' : 'laptop';
   // A page this DOCK leaves out, such as an old bookmark, opens Home.
-  const path = hasPage(mode, currentPath) ? currentPath : '/';
+  // The Bug Reports page exists only in board mode.
+  const path = hasPage(mode, currentPath) && (currentPath !== '/bugs' || data?.boardMode === true) ? currentPath : '/';
 
   const renderPage = () => {
     switch (path) {
@@ -115,6 +117,7 @@ function App() {
       case '/demo-videos': return <DemoVideosPage onTicketClick={navigateToTicket} />;
       case '/dev-servers': return <DevServersPage />;
       case '/attention': return <NeedsAttentionPage onTicketClick={navigateToTicket} />;
+      case '/bugs': return <BugReportsPage />;
       case '/settings': return <SettingsPage />;
       case '/ticket': return selectedTicketKey ? <TicketDetailPage ticketKey={selectedTicketKey} onBack={() => handleNavigate('/dashboard')} /> : <DashboardPage onTicketClick={navigateToTicket} />;
       default: return <HomePage onTicketClick={navigateToTicket} onNavigate={handleNavigate} />;
