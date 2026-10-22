@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { AlertTriangle, Bot, ExternalLink, GitMerge, Hand } from 'lucide-react';
-import { GET_BOARD_ITEMS, GET_NEEDS_ATTENTION } from '../graphql/queries';
-import { CHECK_CONFLICTS, CONFIRM_BOARD_ITEMS } from '../graphql/mutations';
+import { AlertTriangle, Bot, ExternalLink, GitMerge, Hand, PenLine } from 'lucide-react';
+import { BOARD_ANSWER_JOB, GET_BOARD_ITEMS, GET_NEEDS_ATTENTION } from '../graphql/queries';
+import { CHECK_CONFLICTS, CONFIRM_BOARD_ITEMS, WRITE_BOARD_ANSWERS } from '../graphql/mutations';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
 import { AllClearScene } from '../components/empty/scenes/AllClearScene';
@@ -14,8 +14,11 @@ import { cn } from '../lib/cn';
 import { useBoardMode } from '../lib/boardMode';
 import { confirmPlan, groupItems, type BoardItem } from '../lib/boardItems';
 import { BoardItemCard } from '../components/BoardItemCard';
+import { CONFIRM_WINDOW_MS, pressWrite, writeButton } from '../lib/writeAnswers';
 
 interface NeedsAttentionPageProps { onTicketClick: (key: string) => void }
+
+const POLL_WHILE_WRITING_MS = 3000;
 
 const agentLabel: Record<string, string> = { AGENT_WAITING: 'WAITING', AGENT_AC_FAILED: 'AC FAILED', AGENT_STALLED: 'STALLED', AGENT_CHANGES_REQUESTED: 'CHANGES REQUESTED', AGENT_CHECKS_FAILING: 'CI FAILING' };
 
@@ -23,6 +26,30 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
   const { data, loading, error } = useQuery(GET_NEEDS_ATTENTION, { ...CACHED_QUERY_OPTIONS, pollInterval: 30000 });
   const board = useBoardMode();
   const boardQuery = useQuery(GET_BOARD_ITEMS, { ...CACHED_QUERY_OPTIONS, pollInterval: 30000, skip: !board });
+  // How many answers wait for `sous answer`; asked every few seconds while it runs.
+  const [writing, setWriting] = useState(false);
+  const jobQuery = useQuery(BOARD_ANSWER_JOB, { ...CACHED_QUERY_OPTIONS, pollInterval: writing ? POLL_WHILE_WRITING_MS : 30000, skip: !board });
+  const [writeAnswers, { loading: starting }] = useMutation(WRITE_BOARD_ANSWERS);
+  // The click time; the timer below clears it, so the render needs no clock of its own.
+  const [armedAt, setArmedAt] = useState<number | null>(null);
+  const [writeNote, setWriteNote] = useState<string | null>(null);
+  const job = jobQuery.data?.boardAnswerJob;
+  const running = job?.running === true;
+  const { refetch: refetchBoard } = boardQuery;
+  const { refetch: refetchJob } = jobQuery;
+  // The server runs it on its own; when it ends, load the board again so the written cards disappear.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    setWriting(running);
+    if (wasRunning.current && !running) void refetchBoard();
+    wasRunning.current = running;
+  }, [running, refetchBoard]);
+  // The armed button goes back to normal after the confirm window.
+  useEffect(() => {
+    if (armedAt === null) return undefined;
+    const timer = window.setTimeout(() => setArmedAt(null), CONFIRM_WINDOW_MS);
+    return () => window.clearTimeout(timer);
+  }, [armedAt]);
   const [checkConflicts] = useMutation(CHECK_CONFLICTS);
   const [confirmBoardItems, { loading: confirming }] = useMutation(CONFIRM_BOARD_ITEMS);
   // "Confirm all except": the scope ('all' or a ticket key) and the items the owner keeps open.
@@ -42,6 +69,21 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
   const inBatch = (groupKey: string) => batchScope === 'all' || batchScope === groupKey;
   const batchItems = batchScope === 'all' ? boardItems : boardGroups.find((group) => group.key === batchScope)?.items ?? [];
   const plan = confirmPlan(batchItems, excepted);
+  const refetchAnswers = () => { void refetchBoard(); void refetchJob(); };
+  const button = writeButton({ pending: job?.pending ?? 0, running: running || starting, configured: job?.configured === true, armedAt, now: armedAt ?? 0 });
+  const pressWriteAnswers = async () => {
+    const press = pressWrite(armedAt, Date.now());
+    setArmedAt(press.armedAt);
+    if (!press.run) return;
+    setWriteNote(null);
+    try {
+      const result = (await writeAnswers()).data?.writeBoardAnswers;
+      if (result && !result.started && !result.running) setWriteNote(result.error || 'Writing the answers did not start.');
+      await Promise.all([refetchJob(), refetchBoard()]);
+    } catch (failure) {
+      setWriteNote(failure instanceof Error ? failure.message : 'Writing the answers did not start');
+    }
+  };
   const startBatch = (scope: string) => { setBatchScope(scope); setExcepted(new Set()); };
   const toggleExcept = (id: string) => setExcepted((current) => {
     const next = new Set(current);
@@ -54,7 +96,7 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
       const { confirmed, skipped } = res.data?.confirmBoardItems ?? { confirmed: 0, skipped: [] };
       setToast({ message: `Confirmed ${confirmed}${skipped.length ? `, ${skipped.length} already answered` : ''}. sous writes them to the board on its next \`sous answer\`.`, type: 'success' });
       setBatchScope(null);
-      await boardQuery.refetch();
+      refetchAnswers();
     } catch (failure) {
       setToast({ message: failure instanceof Error ? failure.message : 'Confirm failed', type: 'error' });
     }
@@ -74,11 +116,21 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
   return (
     <Page width="full">
       <Card className="mb-8 border-status-conflict/60 bg-status-conflict-bg shadow-none">
-        <div className="flex items-center gap-4">
-          <div className="rounded-sm bg-status-conflict-bg p-4 text-status-conflict"><AlertTriangle size={36} aria-hidden="true" /></div>
-          <div><h1 className="text-balance font-display text-2xl font-bold text-status-conflict">Needs Immediate Attention</h1><p className="mt-1 text-pretty text-secondary-foreground">Pull requests with merge conflicts, requested changes or failing checks, and tickets whose agent is waiting on you, failed a check or went quiet.</p></div>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="rounded-sm bg-status-conflict-bg p-4 text-status-conflict"><AlertTriangle size={36} aria-hidden="true" /></div>
+            <div><h1 className="text-balance font-display text-2xl font-bold text-status-conflict">Needs Immediate Attention</h1><p className="mt-1 text-pretty text-secondary-foreground">Pull requests with merge conflicts, requested changes or failing checks, and tickets whose agent is waiting on you, failed a check or went quiet.</p></div>
+          </div>
+          {board && (
+            <Button size="sm" variant="primary" disabled={button.disabled} onClick={() => void pressWriteAnswers()}>
+              <PenLine size={14} aria-hidden="true" />{button.label}
+            </Button>
+          )}
         </div>
       </Card>
+      {/* The server keeps the last failure until the next run succeeds, so it only counts once the run is over. */}
+      {board && !running && job?.lastError && <Card className="mb-4 border-status-conflict text-status-conflict" role="alert">Writing answers failed: {job.lastError}</Card>}
+      {board && writeNote && <Card className="mb-4 border-amber-300/50" role="status">{writeNote}</Card>}
 
       {board && boardGroups.length > 0 && (
         <section className="mb-8 flex flex-col gap-6" aria-label="On the board">
@@ -110,7 +162,7 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
                 <BoardItemCard
                   key={item.id}
                   item={item}
-                  onSaved={() => void boardQuery.refetch()}
+                  onSaved={refetchAnswers}
                   except={inBatch(group.key) ? { checked: excepted.has(item.id), onToggle: () => toggleExcept(item.id) } : undefined}
                 />
               ))}

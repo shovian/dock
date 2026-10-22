@@ -454,6 +454,12 @@ export const DISMISS_BOARD_THREAD = gql`
   }
 `;
 
+export const WRITE_BOARD_ANSWERS = gql`
+  mutation WriteBoardAnswers {
+    writeBoardAnswers { started running error }
+  }
+`;
+
 export const REFRESH_BOARD_THREADS = gql`
   mutation RefreshBoardThreads {
     refreshBoardThreads { started running error }

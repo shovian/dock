@@ -189,6 +189,26 @@ export class BoardService {
     }).sort((a, b) => Number(b.escalated) - Number(a.escalated) || a.epic.localeCompare(b.epic) || a.id.localeCompare(b.id, undefined, { numeric: true }));
   }
 
+  /**
+   * Pending answers `sous answer` can write: those whose item is still open on the board. An answer for an item that left
+   * the board (a later sync without it, or resolved by hand) cannot be written or acknowledged, so it is not counted and
+   * not pulled; it comes back with the item. `machine` limits it to one producer, as pull does.
+   */
+  private async writableAnswers(machine?: string): Promise<{ answer: BoardAnswerRow; item: BoardItem }[]> {
+    const open = new Map((await this.store.items()).filter((row) => !row.removedAt).map((row) => [row.id, JSON.parse(row.payload) as BoardItem]));
+    return (await this.store.answers({ pendingOnly: true, ...(machine ? { machine } : {}) }))
+      .filter((answer) => open.has(answer.itemId))
+      .map((answer) => ({ answer, item: open.get(answer.itemId)! }));
+  }
+
+  /**
+   * How many answers wait for `sous answer`, summed over every producer machine: the GraphQL side does not know which
+   * machine's token the button's run uses, and each machine pulls only its own, so this is the total of all their pulls.
+   */
+  async pendingAnswerCount(): Promise<number> {
+    return (await this.writableAnswers()).length;
+  }
+
   /** The owner's answer. A later answer before sous applied it replaces the earlier one. */
   async answer(itemId: string, value: unknown, now = new Date()) {
     const row = (await this.store.items()).find((entry) => entry.id === itemId && !entry.removedAt);
@@ -222,14 +242,10 @@ export class BoardService {
 
   /** What `sous answer` applies: each pending answer with its item, for the producer that owns the items. */
   async pull(machine: string) {
-    const items = new Map((await this.store.items()).map((row) => [row.id, JSON.parse(row.payload) as BoardItem]));
-    return (await this.store.answers({ pendingOnly: true, machine }))
-      .filter((row) => items.has(row.itemId))
-      .map((row) => {
-        const item = items.get(row.itemId)!;
-        const parts = JSON.parse(row.payload) as BoardAnswerPart[];
-        return { id: row.id, createdAt: row.createdAt.toISOString(), item, parts, keepsBuilt: keepsBuilt(item, parts) };
-      });
+    return (await this.writableAnswers(machine)).map(({ answer, item }) => {
+      const parts = JSON.parse(answer.payload) as BoardAnswerPart[];
+      return { id: answer.id, createdAt: answer.createdAt.toISOString(), item, parts, keepsBuilt: keepsBuilt(item, parts) };
+    });
   }
 
   async ack(input: unknown, machine: string, now = new Date()) {

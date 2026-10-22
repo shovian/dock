@@ -81,6 +81,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
 
     assert.deepStrictEqual(queryFields, [
       'authStatus',
+      'boardAnswerJob',
       'boardItems',
       'boardMode',
       'boardThreads',
@@ -191,7 +192,13 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
       'validateGitHub',
       'validateJira',
       'verifyMasterPin',
+      'writeBoardAnswers',
     ]);
+  });
+
+  await t.test('should tell the answers button whether it is configured', () => {
+    const job = buildASTSchema(typeDefs).getType('BoardAnswerJob') as import('graphql').GraphQLObjectType;
+    assert.deepStrictEqual(Object.keys(job.getFields()).sort(), ['configured', 'lastError', 'pending', 'running']);
   });
 
   await t.test('should put every root field behind the PIN or on the named public list', () => {
