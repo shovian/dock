@@ -934,3 +934,32 @@ export const GET_BOARD_ITEMS = gql`
     }
   }
 `;
+
+export const BOARD_THREADS = gql`
+  query BoardThreads {
+    boardThreads {
+      rows {
+        id
+        forum
+        title
+        url
+        state
+        why
+        needsYou
+        older
+        createdAt
+        lastActivity
+        tags
+        tickets { key status assignee }
+        prs
+        approvals { have need }
+        lastMessage
+        dismissed
+      }
+      syncedAt
+      jiraSnapshotAt
+      refreshing
+      refreshError
+    }
+  }
+`;

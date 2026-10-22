@@ -447,3 +447,15 @@ export const CONFIRM_BOARD_ITEMS = gql`
     confirmBoardItems(ids: $ids) { confirmed skipped }
   }
 `;
+
+export const DISMISS_BOARD_THREAD = gql`
+  mutation DismissBoardThread($id: String!) {
+    dismissBoardThread(id: $id)
+  }
+`;
+
+export const REFRESH_BOARD_THREADS = gql`
+  mutation RefreshBoardThreads {
+    refreshBoardThreads { started running error }
+  }
+`;
