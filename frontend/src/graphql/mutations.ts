@@ -435,3 +435,9 @@ export const ANSWER_TICKET = gql`
     answerTicket(ticketKey: $ticketKey, text: $text)
   }
 `;
+
+export const ANSWER_BOARD_ITEM = gql`
+  mutation AnswerBoardItem($id: ID!, $answers: [BoardAnswerInput!]!) {
+    answerBoardItem(id: $id, answers: $answers)
+  }
+`;

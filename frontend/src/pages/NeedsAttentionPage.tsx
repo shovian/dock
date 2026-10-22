@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { AlertTriangle, Bot, ExternalLink, GitMerge, Hand } from 'lucide-react';
-import { GET_NEEDS_ATTENTION } from '../graphql/queries';
+import { GET_BOARD_ITEMS, GET_NEEDS_ATTENTION } from '../graphql/queries';
 import { CHECK_CONFLICTS } from '../graphql/mutations';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
@@ -11,6 +11,9 @@ import { Toast } from '../components/Toast';
 import { Badge, Button, Card, Page } from '../components/ui';
 import { CACHED_QUERY_OPTIONS, isInitialQueryLoading } from '../lib/queryPolicy';
 import { cn } from '../lib/cn';
+import { useBoardMode } from '../lib/boardMode';
+import { groupItems, type BoardItem } from '../lib/boardItems';
+import { BoardItemCard } from '../components/BoardItemCard';
 
 interface NeedsAttentionPageProps { onTicketClick: (key: string) => void }
 
@@ -18,6 +21,8 @@ const agentLabel: Record<string, string> = { AGENT_WAITING: 'WAITING', AGENT_AC_
 
 const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }) => {
   const { data, loading, error } = useQuery(GET_NEEDS_ATTENTION, { ...CACHED_QUERY_OPTIONS, pollInterval: 30000 });
+  const board = useBoardMode();
+  const boardQuery = useQuery(GET_BOARD_ITEMS, { ...CACHED_QUERY_OPTIONS, pollInterval: 30000, skip: !board });
   const [checkConflicts] = useMutation(CHECK_CONFLICTS);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictMessage, setConflictMessage] = useState('');
@@ -26,7 +31,10 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
   if (isInitialQueryLoading(loading, data)) return <Page width="full"><LoadingSkeleton /></Page>;
   if (error && !data) return <Page width="full"><Card className="border-status-conflict text-status-conflict" role="alert">Error: {error.message}</Card></Page>;
 
-  const items = data?.needsAttention || [];
+  // Board mode: the board cards replace the agent's one-line "waiting" text for the same tickets.
+  const items = (data?.needsAttention || []).filter((item: any) => !(board && item.type === 'AGENT_WAITING'));
+  const boardItems: BoardItem[] = boardQuery.data?.boardItems || [];
+  const boardGroups = groupItems(boardItems);
   const handleInspectConflict = async (owner: string, repo: string, pullNumber: number) => {
     try {
       const res = await checkConflicts({ variables: { owner, repo, pullNumber } });
@@ -48,7 +56,23 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
         </div>
       </Card>
 
-      {items.length === 0 ? (
+      {board && boardGroups.length > 0 && (
+        <section className="mb-8 flex flex-col gap-6" aria-label="On the board">
+          <div>
+            <h2 className="font-display text-xl font-bold">On the board</h2>
+            <p className="mt-1 text-pretty text-sm text-secondary-foreground">Issues waiting on you and decisions sous made on your behalf. The work already continued on the option marked built: confirm it, or pick another and the ticket gets a revision.</p>
+          </div>
+          {boardGroups.map((group) => (
+            <div key={group.key} className="flex flex-col gap-3">
+              <h3 className="font-mono text-sm font-bold">{group.key} <span className="font-normal text-muted-foreground">· {group.epic} · {group.items.length}</span></h3>
+              {group.items.map((item) => <BoardItemCard key={item.id} item={item} onSaved={() => void boardQuery.refetch()} />)}
+            </div>
+          ))}
+        </section>
+      )}
+      {boardQuery.error && <Card className="mb-4 border-status-conflict text-status-conflict" role="alert">Board items failed to load: {boardQuery.error.message}</Card>}
+
+      {items.length === 0 && boardGroups.length > 0 ? null : items.length === 0 ? (
         <Card><EmptyState scene={<AllClearScene />} title={<span className="text-status-merged">All clear</span>} description="No merge conflicts, and no agent is waiting on you." /></Card>
       ) : (
         <div className="flex flex-col gap-4">

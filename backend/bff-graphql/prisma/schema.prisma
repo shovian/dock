@@ -324,3 +324,31 @@ model ElevenLabsKey {
   parkedUntil DateTime?
   createdAt   DateTime  @default(now())
 }
+
+/// A blackboard entry that waits on the owner (issue I-n with Resolver OWNER, or a SHOV decision D-n), sent by `sous dock-sync`.
+model BoardItem {
+  /// "<epic path>#I-12" or "<epic path>#D-3".
+  id        String    @id
+  /// The ingest token's machine that sent it; only that producer pulls its answers.
+  machine   String
+  payload   String
+  updatedAt DateTime
+  /// Set when the producer stopped sending the item (answered on the board, closed, confirmed).
+  removedAt DateTime?
+
+  @@index([machine])
+}
+
+/// The owner's answer to a board item. Kept with no expiry until `sous answer` writes it to the board and acknowledges it.
+model BoardAnswer {
+  id        Int       @id @default(autoincrement())
+  itemId    String
+  machine   String
+  payload   String
+  createdAt DateTime
+  appliedAt DateTime?
+  note      String?
+
+  @@index([machine, appliedAt])
+  @@index([itemId])
+}

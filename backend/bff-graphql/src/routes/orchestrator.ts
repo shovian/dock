@@ -11,6 +11,7 @@ import { receiveDemoVideo } from './demo-videos';
 import { ELEVENLABS_ROUTES, elevenLabsKeys, elevenLabsRoute, type ElevenLabsKeys } from '../integrations/elevenlabs-keys';
 import { MAX_TRANSCRIPT_BYTES, OrchestratorInputError, OrchestratorService, orchestratorService } from '../integrations/orchestrator';
 import { StorageService } from '../storage/service';
+import { BoardInputError, BoardService, boardService } from '../integrations/board';
 
 const clientKey = (request: Request) => request.ip || request.socket.remoteAddress || 'unknown';
 
@@ -48,6 +49,7 @@ export function createOrchestratorIngestRouter(
   keys: ElevenLabsKeys = elevenLabsKeys,
   videos: DemoVideos = demoVideos,
   storageSettings: DemoStorage = demoStorage,
+  board: BoardService = boardService,
 ): Router {
   const router = Router();
 
@@ -76,6 +78,14 @@ export function createOrchestratorIngestRouter(
   };
 
   const small = express.json({ limit: '256kb' });
+  // A board input error is the producer's fault, like an orchestrator input error: answer 400, not 500.
+  const boardWork = <T>(work: () => Promise<T>) => work().catch((error) => {
+    if (error instanceof BoardInputError) throw new OrchestratorInputError(error.message);
+    throw error;
+  });
+  router.post('/board/items', express.json({ limit: '2mb' }), handle((body, _signal, machine) => boardWork(() => board.ingest(body, machine))));
+  router.post('/board/answers/pull', small, handle((_body, _signal, machine) => boardWork(() => board.pull(machine))));
+  router.post('/board/answers/ack', small, handle((body, _signal, machine) => boardWork(() => board.ack(body, machine))));
   router.post('/', small, handle(async (body, _signal, machine) => {
     const run = await service.ingestLedger(body, new Date(), machine);
     return run.ignored ? { key: run.key, ignored: true, owner: run.machine } : { key: run.key, stage: run.stage };

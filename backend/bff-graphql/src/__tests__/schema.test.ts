@@ -81,6 +81,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
 
     assert.deepStrictEqual(queryFields, [
       'authStatus',
+      'boardItems',
       'boardMode',
       'calendarEvents',
       'chatActivity',
@@ -129,6 +130,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
       'addElevenLabsKey',
       'addMonitor',
       'addQuickLink',
+      'answerBoardItem',
       'answerChatInteraction',
       'answerTicket',
       'backfillSprintDashboards',

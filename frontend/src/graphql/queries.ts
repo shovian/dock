@@ -908,3 +908,29 @@ export const GET_DEMO_STORAGE = gql`
     demoStorage { configured endpoint region bucket folder publicBaseUrl accessKeyMasked secretSet }
   }
 `;
+
+export const GET_BOARD_ITEMS = gql`
+  query GetBoardItems {
+    boardItems {
+      id
+      epic
+      kind
+      ref
+      title
+      tickets
+      type
+      status
+      resolver
+      blocks
+      escalated
+      detail
+      asks { question options { key label effect built } }
+      prs
+      findings
+      source
+      pending { ask choice text }
+      keepsBuilt
+      answeredAt
+    }
+  }
+`;
