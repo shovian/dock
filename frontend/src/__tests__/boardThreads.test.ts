@@ -6,7 +6,7 @@ let n = 0;
 const row = (overrides: Partial<BoardThread>): BoardThread => ({
   id: `t${++n}`, forum: 'bugreport', title: `Thread ${n}`, url: `https://discord.example/channels/1/${n}`, state: 'FLOW_1', why: 'Sample row',
   needsYou: true, older: false, createdAt: '2026-10-01T00:00:00.000Z', lastActivity: '2026-10-01T00:00:00.000Z', tags: [], tickets: [], prs: [],
-  approvals: null, lastMessage: '', dismissed: false, ...overrides,
+  approvals: null, slots: null, lastMessage: '', dismissed: false, ...overrides,
 });
 const ids = (rows: BoardThread[]) => rows.map((r) => r.id);
 

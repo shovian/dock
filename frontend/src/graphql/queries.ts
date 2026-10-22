@@ -953,6 +953,7 @@ export const BOARD_THREADS = gql`
         tickets { key status assignee }
         prs
         approvals { have need }
+        slots { have need }
         lastMessage
         dismissed
       }

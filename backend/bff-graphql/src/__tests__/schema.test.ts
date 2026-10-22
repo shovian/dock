@@ -247,6 +247,10 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
       ['ChatInteraction', 'answeredAt', 'String'],
       ['ChatModel', 'efforts', '[String!]!'],
       ['ChatMachineOptions', 'fastAvailable', 'Boolean!'],
+      ['BoardThread', 'approvals', 'BoardThreadApprovals'],
+      ['BoardThread', 'slots', 'BoardThreadSlots'],
+      ['BoardThreadSlots', 'have', 'Int!'],
+      ['BoardThreadSlots', 'need', 'Int!'],
     ]) {
       assert.strictEqual(String(field(type, name).type), shape, `${type}.${name}`);
     }

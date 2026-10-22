@@ -18,6 +18,7 @@ export const ThreadRow: React.FC<{ thread: BoardThread; now: number; dismissing:
           <Badge key={ticket.key} variant="accent">{ticket.key}{ticket.status ? ` · ${ticket.status}` : ''}</Badge>
         ))}
         {thread.approvals && <Badge variant={thread.approvals.have >= thread.approvals.need ? 'success' : 'neutral'}>approvals {thread.approvals.have}/{thread.approvals.need}</Badge>}
+        {thread.slots && <Badge variant={thread.slots.have >= thread.slots.need ? 'success' : 'neutral'}>slots {thread.slots.have}/{thread.slots.need}</Badge>}
       </div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h3 className="min-w-0 text-pretty text-base font-semibold">

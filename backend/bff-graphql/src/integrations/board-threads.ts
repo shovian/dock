@@ -16,6 +16,7 @@ export const THREAD_STATES = [
 export type ThreadState = typeof THREAD_STATES[number];
 
 export interface ThreadTicket { key: string; status: string | null; assignee: string | null }
+export interface ThreadCount { have: number; need: number }
 export interface ThreadRow {
   id: string;
   forum: string;
@@ -30,7 +31,10 @@ export interface ThreadRow {
   tags: string[];
   tickets: ThreadTicket[];
   prs: string[];
-  approvals: { have: number; need: number } | null;
+  /** GitHub approvals on the PR (informational). */
+  approvals: ThreadCount | null;
+  /** Reviewers who said "on it" in the thread; this decides whether a review request needs the owner. */
+  slots: ThreadCount | null;
   lastMessage: string;
 }
 export interface ThreadView extends ThreadRow { dismissed: boolean }
@@ -71,6 +75,12 @@ function count(value: unknown, what: string): number {
   return value as number;
 }
 
+function haveNeed(value: unknown, id: string, what: string): ThreadCount | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)) throw new ThreadInputError(`${id}: ${what} must be { have, need } or null`);
+  return { have: count(value.have, `${id}: ${what}.have`), need: count(value.need, `${id}: ${what}.need`) };
+}
+
 export function parseThread(value: unknown): ThreadRow {
   if (!isRecord(value)) throw new ThreadInputError('A thread must be an object');
   const id = text(value.id, 40);
@@ -88,11 +98,8 @@ export function parseThread(value: unknown): ThreadRow {
     const key = text(raw.key, 40).toUpperCase();
     return TICKET.test(key) ? { key, status: optional(raw.status, 100), assignee: optional(raw.assignee, 100) } : null;
   }).filter((ticket): ticket is ThreadTicket => ticket !== null);
-  let approvals: ThreadRow['approvals'] = null;
-  if (value.approvals !== undefined && value.approvals !== null) {
-    if (!isRecord(value.approvals)) throw new ThreadInputError(`${id}: approvals must be { have, need } or null`);
-    approvals = { have: count(value.approvals.have, `${id}: approvals.have`), need: count(value.approvals.need, `${id}: approvals.need`) };
-  }
+  const approvals = haveNeed(value.approvals, id, 'approvals');
+  const slots = haveNeed(value.slots, id, 'slots'); // absent from an older script's rows: null
   return {
     id,
     forum,
@@ -112,6 +119,7 @@ export function parseThread(value: unknown): ThreadRow {
       return parsed;
     }),
     approvals,
+    slots,
     lastMessage: text(value.lastMessage, MAX_TEXT),
   };
 }
@@ -164,7 +172,9 @@ export class ThreadService {
     const synced = meta ? (JSON.parse(meta.payload) as ThreadMeta) : null;
     const rows = records.filter((row) => row.id !== META_ID && !row.removedAt).map((row): ThreadView => {
       const at = dismissed.get(row.id);
-      return { ...(JSON.parse(row.payload) as ThreadRow), dismissed: at !== undefined && at.getTime() === row.lastActivity.getTime() };
+      const stored = JSON.parse(row.payload) as ThreadRow;
+      // A row stored before slots existed has none.
+      return { ...stored, slots: stored.slots ?? null, dismissed: at !== undefined && at.getTime() === row.lastActivity.getTime() };
     }).sort((a, b) => Number(b.needsYou) - Number(a.needsYou) || b.lastActivity.localeCompare(a.lastActivity) || a.id.localeCompare(b.id));
     return { rows, syncedAt: synced?.syncedAt ?? null, jiraSnapshotAt: synced?.jiraSnapshotAt ?? null };
   }

@@ -42,6 +42,7 @@ const row = (id: string, extra: Partial<ThreadRow> = {}) => ({
   tickets: [{ key: 'ABC-12', status: 'In Progress', assignee: null }],
   prs: ['https://github.com/example/repo/pull/7'],
   approvals: { have: 1, need: 2 },
+  slots: { have: 0, need: 2 },
   lastMessage: 'It still fails on step 3',
   ...extra,
 });
@@ -51,6 +52,44 @@ test('parseThread keeps the row the sync sends, with nullable fields as null', (
   const parsed = parseThread(row('101', { approvals: null, tickets: [{ key: 'abc-12', status: null, assignee: null }] }));
   assert.deepStrictEqual([parsed.id, parsed.state, parsed.approvals, parsed.tickets], ['101', 'YOUR_TURN', null, [{ key: 'ABC-12', status: null, assignee: null }]]);
   assert.strictEqual(THREAD_STATES.length, 14);
+});
+
+test('parseThread keeps approvals and slots as two separate counts', () => {
+  const parsed = parseThread(row('101', { approvals: { have: 2, need: 2 }, slots: { have: 0, need: 2 } }));
+  assert.deepStrictEqual([parsed.approvals, parsed.slots], [{ have: 2, need: 2 }, { have: 0, need: 2 }]);
+});
+
+test('parseThread takes a row without slots (an older script) or with null slots as null', () => {
+  const { slots: _slots, ...older } = row('101');
+  assert.strictEqual(parseThread(older).slots, null);
+  assert.strictEqual(parseThread(row('101', { slots: null })).slots, null);
+  assert.deepStrictEqual(parseThread(older).approvals, { have: 1, need: 2 }, 'approvals are untouched');
+});
+
+test('parseThread rejects slots that are not { have, need } whole numbers', () => {
+  for (const bad of ['1/2', [], { have: 1 }, { have: -1, need: 2 }, { have: 1.5, need: 2 }, { have: 1, need: 101 }]) {
+    assert.throws(() => parseThread(row('101', { slots: bad as never })), ThreadInputError, JSON.stringify(bad));
+  }
+});
+
+test('ingest and list round-trip slots next to approvals, with and without slots', async () => {
+  const service = new ThreadService(memoryStore());
+  const { slots: _slots, ...older } = row('2', { approvals: null });
+  await service.ingest(payload([row('1', { approvals: { have: 1, need: 2 }, slots: { have: 0, need: 2 } }), older]), 'sous');
+  const rows = (await service.list()).rows;
+  const byId = (id: string) => rows.find((entry) => entry.id === id)!;
+  assert.deepStrictEqual([byId('1').approvals, byId('1').slots], [{ have: 1, need: 2 }, { have: 0, need: 2 }]);
+  assert.deepStrictEqual([byId('2').approvals, byId('2').slots], [null, null]);
+});
+
+test('list gives slots as null for a row stored before slots existed', async () => {
+  const store = memoryStore();
+  const service = new ThreadService(store);
+  await service.ingest(payload([row('1')]), 'sous');
+  const stored = store.records.find((entry) => entry.id === '1')!;
+  const { slots: _slots, ...old } = JSON.parse(stored.payload);
+  stored.payload = JSON.stringify(old);
+  assert.strictEqual((await service.list()).rows[0].slots, null);
 });
 
 test('parseThread rejects an unknown state', () => {

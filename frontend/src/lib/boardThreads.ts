@@ -4,6 +4,7 @@ export type ThreadTab = 'needs' | 'bugreport' | 'uat-bug-report' | 'pull-request
 
 export interface BoardThreadTicket { key: string; status: string | null; assignee: string | null }
 export interface BoardThreadApprovals { have: number; need: number }
+export interface BoardThreadSlots { have: number; need: number }
 export interface BoardThread {
   id: string;
   forum: string;
@@ -19,6 +20,7 @@ export interface BoardThread {
   tickets: BoardThreadTicket[];
   prs: string[];
   approvals: BoardThreadApprovals | null;
+  slots: BoardThreadSlots | null;
   lastMessage: string;
   dismissed: boolean;
 }

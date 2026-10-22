@@ -230,6 +230,11 @@ export const typeDefs = gql`
     need: Int!
   }
 
+  type BoardThreadSlots {
+    have: Int!
+    need: Int!
+  }
+
   "A Discord forum thread that sous discord-sync sent, with where it stands in the bug-report flow."
   type BoardThread {
     id: ID!
@@ -245,7 +250,10 @@ export const typeDefs = gql`
     tags: [String!]!
     tickets: [BoardThreadTicket!]!
     prs: [String!]!
+    "GitHub approvals on the pull request (informational)."
     approvals: BoardThreadApprovals
+    "Reviewers who said on it in the thread; decides whether the review request needs the owner."
+    slots: BoardThreadSlots
     lastMessage: String!
     "Hidden by the owner until the thread has a new message."
     dismissed: Boolean!
