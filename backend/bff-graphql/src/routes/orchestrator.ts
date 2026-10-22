@@ -12,6 +12,8 @@ import { ELEVENLABS_ROUTES, elevenLabsKeys, elevenLabsRoute, type ElevenLabsKeys
 import { MAX_TRANSCRIPT_BYTES, OrchestratorInputError, OrchestratorService, orchestratorService } from '../integrations/orchestrator';
 import { StorageService } from '../storage/service';
 import { BoardInputError, BoardService, boardService } from '../integrations/board';
+import { ThreadInputError, ThreadService, threadService } from '../integrations/board-threads';
+import { boardMode } from '../board-mode';
 
 const clientKey = (request: Request) => request.ip || request.socket.remoteAddress || 'unknown';
 
@@ -50,6 +52,7 @@ export function createOrchestratorIngestRouter(
   videos: DemoVideos = demoVideos,
   storageSettings: DemoStorage = demoStorage,
   board: BoardService = boardService,
+  threads: ThreadService = threadService,
 ): Router {
   const router = Router();
 
@@ -83,7 +86,17 @@ export function createOrchestratorIngestRouter(
     if (error instanceof BoardInputError) throw new OrchestratorInputError(error.message);
     throw error;
   });
+  const threadWork = <T>(work: () => Promise<T>) => work().catch((error) => {
+    if (error instanceof ThreadInputError) throw new OrchestratorInputError(error.message);
+    throw error;
+  });
   router.post('/board/items', express.json({ limit: '2mb' }), handle((body, _signal, machine) => boardWork(() => board.ingest(body, machine))));
+  // Bug Reports exist only in board mode; elsewhere the route answers as if it were not there.
+  const boardModeOnly = (_request: Request, response: Response, next: express.NextFunction) => {
+    if (boardMode()) next();
+    else response.status(404).json({ error: 'Bug reports are only kept in board mode' });
+  };
+  router.post('/board/threads', boardModeOnly, express.json({ limit: '4mb' }), handle((body, _signal, machine) => threadWork(() => threads.ingest(body, machine))));
   router.post('/board/answers/pull', small, handle((_body, _signal, machine) => boardWork(() => board.pull(machine))));
   router.post('/board/answers/ack', small, handle((body, _signal, machine) => boardWork(() => board.ack(body, machine))));
   router.post('/', small, handle(async (body, _signal, machine) => {
