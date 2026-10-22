@@ -523,3 +523,16 @@ test('the resume count grows only after the message is sent, and starts again on
   await fresh.cron.runFill();
   assert.strictEqual(fresh.state.cache.has('resumes:QRD-5'), false, 'a start, a retry or a confirmed ticket starts at zero');
 });
+
+test('board mode: the cron starts and resumes nothing; work starts from the blackboard', async () => {
+  const saved = process.env.DOCK_BOARD_MODE;
+  process.env.DOCK_BOARD_MODE = '1';
+  try {
+    const w = world({ tickets: [ticket('QRD-1'), ticket('QRD-2')] });
+    const log = await w.cron.runFill();
+    assert.match(String(log.skipped), /board mode/);
+    assert.deepStrictEqual([w.state.sessions.length, w.state.sent.length], [0, 0]);
+  } finally {
+    if (saved === undefined) delete process.env.DOCK_BOARD_MODE; else process.env.DOCK_BOARD_MODE = saved;
+  }
+});

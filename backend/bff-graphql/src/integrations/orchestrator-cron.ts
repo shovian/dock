@@ -1,3 +1,4 @@
+import { boardMode } from '../board-mode';
 import axios from 'axios';
 import type { PushMessage } from './push';
 import { waitingNotice } from './push-notices';
@@ -370,6 +371,7 @@ export class OrchestratorCron {
   }
 
   private async reasonToSkip(settings: CronSettings, now: Date, ignoreWindow: boolean): Promise<string | null> {
+    if (boardMode()) return 'board mode: work starts from the blackboard, not from the cron';
     if (!(await this.deps.machines()).includes(settings.machine)) return `machine ${settings.machine} has no ingest token`;
     if (!this.deps.online(settings.machine)) return `machine ${settings.machine} is offline`;
     const window = ignoreWindow ? null : outsideWindow(now, settings);

@@ -1,3 +1,4 @@
+import { boardMode } from '../board-mode';
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { generateIngestToken, hashIngestToken } from '../auth/ingest-token';
@@ -839,7 +840,8 @@ export class OrchestratorService {
   // The first status seen is only recorded: a run the cron just started is still To Do until Jira moves it.
   // True when the run was removed because its ticket went back to To Do.
   private async applyJiraStatus(row: RunRow, status: string, now: Date) {
-    if (status.toLowerCase() === TODO_STATUS && row.jiraStatus) {
+    // Board mode: the board, not Jira, says whether a ticket's work is gone.
+    if (status.toLowerCase() === TODO_STATUS && row.jiraStatus && !boardMode()) {
       await this.storage.resetOrchestratorRun(row.key, row.machine ?? DEFAULT_MACHINE, now);
       return true;
     }
