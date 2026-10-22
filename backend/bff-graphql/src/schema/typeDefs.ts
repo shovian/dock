@@ -219,6 +219,54 @@ export const typeDefs = gql`
     answeredAt: String
   }
 
+  type BoardThreadTicket {
+    key: String!
+    status: String
+    assignee: String
+  }
+
+  type BoardThreadApprovals {
+    have: Int!
+    need: Int!
+  }
+
+  "A Discord forum thread that sous discord-sync sent, with where it stands in the bug-report flow."
+  type BoardThread {
+    id: ID!
+    forum: String!
+    title: String!
+    url: String!
+    state: String!
+    why: String!
+    needsYou: Boolean!
+    older: Boolean!
+    createdAt: String!
+    lastActivity: String!
+    tags: [String!]!
+    tickets: [BoardThreadTicket!]!
+    prs: [String!]!
+    approvals: BoardThreadApprovals
+    lastMessage: String!
+    "Hidden by the owner until the thread has a new message."
+    dismissed: Boolean!
+  }
+
+  type BoardThreadPage {
+    rows: [BoardThread!]!
+    syncedAt: String
+    jiraSnapshotAt: String
+    "True while sous discord-sync runs."
+    refreshing: Boolean!
+    "Why the last refresh failed; empty after one that worked."
+    refreshError: String
+  }
+
+  type BoardThreadRefresh {
+    started: Boolean!
+    running: Boolean!
+    error: String
+  }
+
   type BoardBatchResult {
     confirmed: Int!
     "Items the owner had already answered; their answer is kept."
@@ -761,6 +809,7 @@ export const typeDefs = gql`
     ticketRelationGroup(ticketKey: String!): TicketRelationGroup!
     needsAttention: [NeedsAttentionItem!]!
     boardItems: [BoardItem!]!
+    boardThreads: BoardThreadPage!
     settings: Settings
     jiraProjects(url: String, email: String, token: String): [JiraProject!]!
     githubRepos(token: String): [GitHubRepo!]!
@@ -806,6 +855,10 @@ export const typeDefs = gql`
     answerBoardItem(id: ID!, answers: [BoardAnswerInput!]!): Boolean!
     "Confirm all except: keeps what sous built for each listed item."
     confirmBoardItems(ids: [ID!]!): BoardBatchResult!
+    "Hides a Discord thread until it has a new message. False when the thread is not open."
+    dismissBoardThread(id: String!): Boolean!
+    "Starts sous discord-sync unless it already runs; does not wait for it."
+    refreshBoardThreads: BoardThreadRefresh!
     lockSession: Boolean!
     saveDemoLink(ticketKey: String!, url: String!): Boolean
     sendToDiscord(ticketKey: String!, customMessage: String, threadId: String, threadName: String): Boolean
