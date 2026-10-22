@@ -5,12 +5,12 @@ import { FixedJobRunner, execRun, type JobSpec, type JobStart, type RunScript } 
 /**
  * The "Write answers to board" button of Needs Attention: runs `sous answer`, which pulls the owner's answers from this
  * server, writes the `**Jawaban owner:**` lines to the board files, acknowledges them here and resyncs the board items.
- * Exit 1 of that command covers a failed pull and answers that could not be written or acknowledged; those stay in DOCK.
+ * Exit 1 of that command covers a failed pull, an unreadable token or refused URL, and answers that could not be written or acknowledged; those stay in DOCK.
  */
 
 const ANSWER: JobSpec = {
   args: ['answer'],
-  exitMessages: { 1: 'answers not fully written; unwritten ones stay in DOCK' },
+  exitMessages: { 1: 'answers failed or not fully written (see sous answer); unwritten ones stay in DOCK' },
   failed: (code) => `answers failed (exit ${code})`,
   timedOut: 'answers timed out',
   couldNotStart: 'could not start sous answer',
@@ -23,11 +23,11 @@ export class AnswerWriter extends FixedJobRunner {
   }
 }
 
-export interface AnswerJobStatus { pending: number; running: boolean; lastError: string | null }
+export interface AnswerJobStatus { pending: number; running: boolean; lastError: string | null; configured: boolean }
 
 export async function answerJobStatus(board: Pick<BoardService, 'pendingAnswerCount'>, writer: AnswerWriter, env: NodeJS.ProcessEnv = process.env): Promise<AnswerJobStatus> {
-  if (!boardMode(env)) return { pending: 0, running: false, lastError: null };
-  return { pending: await board.pendingAnswerCount(), ...writer.status() };
+  if (!boardMode(env)) return { pending: 0, running: false, lastError: null, configured: false };
+  return { pending: await board.pendingAnswerCount(), ...writer.status(), configured: writer.configured() };
 }
 
 export function startAnswerJob(writer: AnswerWriter, env: NodeJS.ProcessEnv = process.env): JobStart {

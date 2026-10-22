@@ -66,6 +66,11 @@ export class FixedJobRunner {
     return { started: true, running: true, error: null };
   }
 
+  /** False when no script is set or DOCK is not in board mode: start() would refuse. */
+  configured(): boolean {
+    return Boolean(this.scriptPath) && boardMode(this.env);
+  }
+
   status(): { running: boolean; lastError: string | null } {
     return { running: this.running, lastError: this.lastError };
   }

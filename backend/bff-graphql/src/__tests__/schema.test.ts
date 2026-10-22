@@ -196,6 +196,11 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
     ]);
   });
 
+  await t.test('should tell the answers button whether it is configured', () => {
+    const job = buildASTSchema(typeDefs).getType('BoardAnswerJob') as import('graphql').GraphQLObjectType;
+    assert.deepStrictEqual(Object.keys(job.getFields()).sort(), ['configured', 'lastError', 'pending', 'running']);
+  });
+
   await t.test('should put every root field behind the PIN or on the named public list', () => {
     const publicQueries = ['authStatus', 'boardMode', 'dockMode', 'settings'];
     const publicMutations = ['lockSession', 'verifyMasterPin', 'setMasterPin'];

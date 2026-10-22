@@ -282,12 +282,14 @@ export const typeDefs = gql`
   }
 
   type BoardAnswerJob {
-    "Answers the owner gave that sous has not written to the board yet."
+    "Answers the owner gave that sous has not written to the board yet, for items still open on the board."
     pending: Int!
     "True while sous answer runs."
     running: Boolean!
     "Why the last run failed; empty after one that worked."
     lastError: String
+    "False when DOCK cannot run sous answer (not board mode, or DOCK_ANSWER_SYNC unset)."
+    configured: Boolean!
   }
 
   type BoardBatchResult {

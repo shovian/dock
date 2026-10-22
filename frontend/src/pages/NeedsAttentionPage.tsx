@@ -70,7 +70,7 @@ const NeedsAttentionPage: React.FC<NeedsAttentionPageProps> = ({ onTicketClick }
   const batchItems = batchScope === 'all' ? boardItems : boardGroups.find((group) => group.key === batchScope)?.items ?? [];
   const plan = confirmPlan(batchItems, excepted);
   const refetchAnswers = () => { void refetchBoard(); void refetchJob(); };
-  const button = writeButton({ pending: job?.pending ?? 0, running: running || starting, armedAt, now: armedAt ?? 0 });
+  const button = writeButton({ pending: job?.pending ?? 0, running: running || starting, configured: job?.configured === true, armedAt, now: armedAt ?? 0 });
   const pressWriteAnswers = async () => {
     const press = pressWrite(armedAt, Date.now());
     setArmedAt(press.armedAt);

@@ -5,12 +5,13 @@
 
 export const CONFIRM_WINDOW_MS = 5000;
 
-interface ButtonState { pending: number; running: boolean; armedAt: number | null; now: number }
+interface ButtonState { pending: number; running: boolean; configured: boolean; armedAt: number | null; now: number }
 
 const armed = (armedAt: number | null, now: number) => armedAt !== null && now - armedAt < CONFIRM_WINDOW_MS;
 
-export function writeButton({ pending, running, armedAt, now }: ButtonState): { label: string; disabled: boolean } {
+export function writeButton({ pending, running, configured, armedAt, now }: ButtonState): { label: string; disabled: boolean } {
   if (running) return { label: 'Writing…', disabled: true };
+  if (!configured) return { label: 'Write answers to board (not configured)', disabled: true };
   if (pending === 0) return { label: 'Write answers to board (0)', disabled: true };
   if (armed(armedAt, now)) return { label: 'Confirm: no sous run is active', disabled: false };
   return { label: `Write answers to board (${pending})`, disabled: false };

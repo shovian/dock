@@ -78,7 +78,7 @@ test('AnswerWriter', async (t) => {
   await t.test('exit codes give short messages and never the output', async () => {
     const fake = fakeRun();
     const writer = new AnswerWriter(fake.run, '/invented/bin/sous', 4123, BOARD);
-    for (const [code, message] of [[1, 'answers not fully written; unwritten ones stay in DOCK'], [7, 'answers failed (exit 7)']] as const) {
+    for (const [code, message] of [[1, 'answers failed or not fully written (see sous answer); unwritten ones stay in DOCK'], [7, 'answers failed (exit 7)']] as const) {
       writer.start();
       fake.finish.at(-1)!.resolve({ code, output: 'invented output with /invented/secret-token' });
       await settle();
@@ -127,6 +127,40 @@ test('pending answers', async (t) => {
   });
 });
 
+test('orphaned and multi-machine answers', async (t) => {
+  await t.test('an answer whose item left the board is not pending and is not pulled; it returns with the item', async () => {
+    const board = new BoardService(memoryStore());
+    await board.ingest({ items: [decision(1), decision(2)] }, 'm1');
+    await board.confirmAll([decision(1).id, decision(2).id]);
+    assert.strictEqual(await board.pendingAnswerCount(), 2);
+    await board.ingest({ items: [decision(2)] }, 'm1');
+    assert.strictEqual(await board.pendingAnswerCount(), 1);
+    assert.deepStrictEqual((await board.pull('m1')).map((answer) => answer.item.id), [decision(2).id]);
+    await board.ingest({ items: [] }, 'm1');
+    assert.strictEqual(await board.pendingAnswerCount(), 0);
+    assert.deepStrictEqual(await board.pull('m1'), []);
+    await board.ingest({ items: [decision(1)] }, 'm1');
+    assert.strictEqual(await board.pendingAnswerCount(), 1);
+    assert.deepStrictEqual((await board.pull('m1')).map((answer) => answer.item.id), [decision(1).id]);
+  });
+
+  await t.test('the count is what the producers pull together: each machine pulls its own open items', async () => {
+    const board = new BoardService(memoryStore());
+    const other = { ...decision(9), id: 'Sprint-1/Other-Epic#D-9' };
+    await board.ingest({ items: [decision(1)] }, 'm1');
+    await board.ingest({ items: [other] }, 'm2');
+    await board.confirmAll([decision(1).id, other.id]);
+    assert.strictEqual(await board.pendingAnswerCount(), 2);
+    assert.deepStrictEqual((await board.pull('m1')).map((answer) => answer.item.id), [decision(1).id]);
+    assert.deepStrictEqual((await board.pull('m2')).map((answer) => answer.item.id), [other.id]);
+    assert.strictEqual((await board.pull('m1')).length + (await board.pull('m2')).length, await board.pendingAnswerCount());
+    // m2 stops sending its item: only m1's answer is left to write.
+    await board.ingest({ items: [] }, 'm2');
+    assert.strictEqual(await board.pendingAnswerCount(), 1);
+    assert.deepStrictEqual(await board.pull('m2'), []);
+  });
+});
+
 test('answer job in the API', async (t) => {
   const board = new BoardService(memoryStore());
   await board.ingest({ items: [decision(1), decision(2)] }, 'invented-machine');
@@ -135,15 +169,15 @@ test('answer job in the API', async (t) => {
   await t.test('status reports pending and the writer state in board mode', async () => {
     const fake = fakeRun();
     const writer = new AnswerWriter(fake.run, '/invented/bin/sous', 4123, BOARD);
-    assert.deepStrictEqual(await answerJobStatus(board, writer, BOARD), { pending: 2, running: false, lastError: null });
+    assert.deepStrictEqual(await answerJobStatus(board, writer, BOARD), { pending: 2, running: false, lastError: null, configured: true });
     assert.deepStrictEqual(startAnswerJob(writer, BOARD), { started: true, running: true, error: null });
-    assert.deepStrictEqual(await answerJobStatus(board, writer, BOARD), { pending: 2, running: true, lastError: null });
+    assert.deepStrictEqual(await answerJobStatus(board, writer, BOARD), { pending: 2, running: true, lastError: null, configured: true });
   });
 
   await t.test('outside board mode: nothing pending, not running, and start refuses without spawning', async () => {
     const fake = fakeRun();
     const writer = new AnswerWriter(fake.run, '/invented/bin/sous', 4123, BOARD);
-    assert.deepStrictEqual(await answerJobStatus(board, writer, { PATH: '/usr/bin' }), { pending: 0, running: false, lastError: null });
+    assert.deepStrictEqual(await answerJobStatus(board, writer, { PATH: '/usr/bin' }), { pending: 0, running: false, lastError: null, configured: false });
     assert.deepStrictEqual(startAnswerJob(writer, { PATH: '/usr/bin' }), NOT_CONFIGURED);
     assert.strictEqual(fake.calls.length, 0);
   });
