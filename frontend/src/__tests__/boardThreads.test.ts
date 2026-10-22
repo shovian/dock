@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { STATE_LABEL, STATE_ORDER, groupThreads, type BoardThread } from '../lib/boardThreads';
+import { STATE_LABEL, STATE_ORDER, groupThreads, newestFirst, type BoardThread } from '../lib/boardThreads';
 
 let n = 0;
 const row = (overrides: Partial<BoardThread>): BoardThread => ({
@@ -83,4 +83,14 @@ test('forum tab filters by forum', () => {
 test('every state has a label', () => {
   assert.strictEqual(STATE_ORDER.length, 14);
   for (const state of STATE_ORDER) assert.ok(STATE_LABEL[state], state);
+});
+
+test('newestFirst sorts by last activity without touching the input', () => {
+  const rows = [
+    row({ id: 'a', lastActivity: '2026-10-02T00:00:00.000Z' }),
+    row({ id: 'bad', lastActivity: 'not a date' }),
+    row({ id: 'b', lastActivity: '2026-10-04T00:00:00.000Z' }),
+  ];
+  assert.deepStrictEqual(ids(newestFirst(rows)), ['b', 'a', 'bad']);
+  assert.deepStrictEqual(ids(rows), ['a', 'bad', 'b']);
 });

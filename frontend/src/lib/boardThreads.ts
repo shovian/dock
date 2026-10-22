@@ -68,3 +68,8 @@ export function groupThreads(rows: BoardThread[], tab: ThreadTab): { main: Board
   const folded = inTab.filter((r) => !live(r));
   return { main, older, folded };
 }
+
+/** Rows sorted by last activity, newest first; a copy, the input stays as it is. */
+export function newestFirst(rows: BoardThread[]): BoardThread[] {
+  return [...rows].sort((a, b) => time(b.lastActivity) - time(a.lastActivity));
+}

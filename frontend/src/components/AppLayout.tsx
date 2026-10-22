@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, AlertTriangle, BarChart3, Bot, Box, CalendarDays, ChevronLeft, ChevronRight, History, Home as HomeIcon, LayoutDashboard, MoreHorizontal, Settings as SettingsIcon, Clapperboard, Server } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, Bot, Box, Bug, CalendarDays, ChevronLeft, ChevronRight, History, Home as HomeIcon, LayoutDashboard, MoreHorizontal, Settings as SettingsIcon, Clapperboard, Server } from 'lucide-react';
 import { useQuery } from '@apollo/client';
-import { GET_NEEDS_ATTENTION } from '../graphql/queries';
+import { BOARD_THREADS, GET_NEEDS_ATTENTION } from '../graphql/queries';
 import { NAVIGATION_PREFERENCES_EVENT, NavigationPreferences, readNavigationPreferences, saveNavigationPreferences } from '../lib/navigationPreferences';
 import { applyUpdate, checkForUpdate } from '../lib/appUpdate';
 import { cn } from '../lib/cn';
@@ -9,6 +9,8 @@ import { PHONE_PRIMARY_PATHS, phoneMore } from '../lib/phoneNavigation';
 import { CACHED_QUERY_OPTIONS } from '../lib/queryPolicy';
 import { ChatDock } from '../chat/ChatDock';
 import { hasPage, showsChatDock, useDockMode } from '../lib/dockMode';
+import { useBoardMode } from '../lib/boardMode';
+import { groupThreads } from '../lib/boardThreads';
 import { version as appVersion } from '../../package.json';
 
 // A phone tab: icon over a short label, 44 px tall.
@@ -21,6 +23,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentPath, onNavigate, u
   const [preferences, setPreferences] = useState(readNavigationPreferences);
   const { data } = useQuery(GET_NEEDS_ATTENTION, { ...CACHED_QUERY_OPTIONS, pollInterval: 30000 });
   const conflictCount = data?.needsAttention?.length || 0;
+  const board = useBoardMode();
+  const threads = useQuery(BOARD_THREADS, { ...CACHED_QUERY_OPTIONS, pollInterval: 60000, skip: !board });
+  const bugCount = groupThreads(threads.data?.boardThreads?.rows ?? [], 'needs').main.length;
   const [moreOpen, setMoreOpen] = useState(false);
   const [updateOffered, setUpdateOffered] = useState(false);
 
@@ -54,6 +59,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ currentPath, onNavigate, u
     { path: '/demo-videos', label: 'Demo Videos', icon: Clapperboard, badge: 0 },
     { path: '/dev-servers', label: 'Dev Servers', icon: Server, badge: 0 },
     { path: '/attention', label: 'Needs Attention', icon: AlertTriangle, badge: conflictCount },
+    ...(board ? [{ path: '/bugs', label: 'Bug Reports', icon: Bug, badge: bugCount }] : []),
     { path: '/settings', label: 'System Settings', icon: SettingsIcon, badge: 0 },
   ].filter((item) => hasPage(mode, item.path));
 
