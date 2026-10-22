@@ -81,8 +81,8 @@ export function parseThread(value: unknown): ThreadRow {
   if (!url || !DISCORD_URL.test(url)) throw new ThreadInputError(`${id}: url must be https://discord.com/channels/...`);
   const forum = text(value.forum, 60);
   if (!forum) throw new ThreadInputError(`${id}: needs a forum`);
-  const prs = Array.isArray(value.prs) ? value.prs : [];
-  if (prs.length > MAX_PRS) throw new ThreadInputError(`${id}: at most ${MAX_PRS} pull requests`);
+  // The classifier sends every PR link of the thread: keep the first ones rather than refuse the whole sync.
+  const prs = (Array.isArray(value.prs) ? value.prs : []).slice(0, MAX_PRS);
   const tickets = (Array.isArray(value.tickets) ? value.tickets : []).map((raw): ThreadTicket | null => {
     if (!isRecord(raw)) return null;
     const key = text(raw.key, 40).toUpperCase();

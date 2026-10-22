@@ -62,6 +62,13 @@ test('parseThread rejects a non-discord url', () => {
   assert.throws(() => parseThread(row('101', { prs: ['http://github.com/example/repo/pull/7'] })), /https/);
 });
 
+test('a thread linking more than MAX_PRS pull requests keeps the first ones and the sync goes through', async () => {
+  const service = new ThreadService(memoryStore());
+  const prs = Array.from({ length: 11 }, (_, index) => `https://github.com/example/repo/pull/${index + 1}`);
+  assert.deepStrictEqual(await service.ingest(payload([row('1', { prs })]), 'sous'), { rows: 1, removed: 0 });
+  assert.deepStrictEqual((await service.list()).rows[0].prs, prs.slice(0, 10));
+});
+
 test('ingest replaces the full set and marks missing rows removed', async () => {
   const store = memoryStore();
   const service = new ThreadService(store);
