@@ -935,6 +935,12 @@ export const GET_BOARD_ITEMS = gql`
   }
 `;
 
+export const BOARD_ANSWER_JOB = gql`
+  query BoardAnswerJob {
+    boardAnswerJob { pending running lastError }
+  }
+`;
+
 export const BOARD_THREADS = gql`
   query BoardThreads {
     boardThreads {

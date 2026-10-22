@@ -1,5 +1,6 @@
 import { boardMode, refuseInBoardMode } from '../board-mode';
 import { BoardInputError, boardService } from '../integrations/board';
+import { answerJobStatus, answerWriter, startAnswerJob } from '../integrations/board-answers-job';
 import { ThreadInputError, threadService } from '../integrations/board-threads';
 import { threadRefresher } from '../integrations/board-threads-refresh';
 import { JiraAPI, JiraTicketLookupError } from '../datasources/JiraAPI';
@@ -173,6 +174,7 @@ export const resolvers = {
       return storageAPI.getTicketRelationGroup(ticketKey);
     },
     boardItems: () => boardService.list(),
+    boardAnswerJob: () => answerJobStatus(boardService, answerWriter),
     // Bug Reports exist only in board mode; elsewhere the page is simply empty.
     boardThreads: async () => {
       if (!boardMode()) return { rows: [], syncedAt: null, jiraSnapshotAt: null, refreshing: false, refreshError: null };
@@ -333,6 +335,7 @@ export const resolvers = {
     confirmBoardItems: (_: unknown, { ids }: { ids: unknown }) => boardService.confirmAll(ids).catch(orchestratorInputError),
     dismissBoardThread: async (_: unknown, { id, lastActivity }: { id: string; lastActivity: string }) => (boardMode() ? threadService.dismiss(id, lastActivity).catch(orchestratorInputError) : false),
     refreshBoardThreads: async () => threadRefresher.start(),
+    writeBoardAnswers: async () => startAnswerJob(answerWriter),
     lockSession: async (_: unknown, __: unknown, context: AuthContext) => {
       context.sessions.clear(context.request, context.response);
       return true;
@@ -596,7 +599,7 @@ export const resolvers = {
 };
 
 export const protectedQueries = [
-  'dashboard', 'ticketDetail', 'ticketRelationGroup', 'needsAttention', 'boardItems', 'boardThreads', 'jiraProjects', 'githubRepos', 'quickLinks', 'calendarEvents', 'monitors',
+  'dashboard', 'ticketDetail', 'ticketRelationGroup', 'needsAttention', 'boardItems', 'boardAnswerJob', 'boardThreads', 'jiraProjects', 'githubRepos', 'quickLinks', 'calendarEvents', 'monitors',
   'dockerRuntime', 'dockerContainerLogs', 'orchestrations', 'orchestration', 'ingestTokens', 'elevenLabsKeys', 'devServers', 'devServerLog', 'demoVideos', 'demoStorage',
   'chatSessions', 'chatSession', 'chatMessages', 'chatActivity', 'chatSessionWorkers', 'chatActivityDetail', 'chatSearch', 'chatBridge', 'chatMachines', 'chatStatus', 'chatBalloons',
   'chatCommands', 'chatMachineOptions',
@@ -607,6 +610,7 @@ export const protectedMutations = [
   'confirmBoardItems',
   'dismissBoardThread',
   'refreshBoardThreads',
+  'writeBoardAnswers',
   'saveDemoLink',
   'sendToDiscord',
   'setTicketDependency',

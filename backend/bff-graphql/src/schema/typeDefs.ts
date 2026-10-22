@@ -275,6 +275,21 @@ export const typeDefs = gql`
     error: String
   }
 
+  type BoardJobStart {
+    started: Boolean!
+    running: Boolean!
+    error: String
+  }
+
+  type BoardAnswerJob {
+    "Answers the owner gave that sous has not written to the board yet."
+    pending: Int!
+    "True while sous answer runs."
+    running: Boolean!
+    "Why the last run failed; empty after one that worked."
+    lastError: String
+  }
+
   type BoardBatchResult {
     confirmed: Int!
     "Items the owner had already answered; their answer is kept."
@@ -817,6 +832,7 @@ export const typeDefs = gql`
     ticketRelationGroup(ticketKey: String!): TicketRelationGroup!
     needsAttention: [NeedsAttentionItem!]!
     boardItems: [BoardItem!]!
+    boardAnswerJob: BoardAnswerJob!
     boardThreads: BoardThreadPage!
     settings: Settings
     jiraProjects(url: String, email: String, token: String): [JiraProject!]!
@@ -867,6 +883,8 @@ export const typeDefs = gql`
     dismissBoardThread(id: String!, lastActivity: String!): Boolean!
     "Starts sous discord-sync unless it already runs; does not wait for it."
     refreshBoardThreads: BoardThreadRefresh!
+    "Starts sous answer (writes the confirmed answers to the board) unless it already runs; does not wait for it."
+    writeBoardAnswers: BoardJobStart!
     lockSession: Boolean!
     saveDemoLink(ticketKey: String!, url: String!): Boolean
     sendToDiscord(ticketKey: String!, customMessage: String, threadId: String, threadName: String): Boolean

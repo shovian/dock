@@ -81,6 +81,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
 
     assert.deepStrictEqual(queryFields, [
       'authStatus',
+      'boardAnswerJob',
       'boardItems',
       'boardMode',
       'boardThreads',
@@ -191,6 +192,7 @@ test('🛡️ [BFF GraphQL] Schema & Resolver Integrity Verification', async (t)
       'validateGitHub',
       'validateJira',
       'verifyMasterPin',
+      'writeBoardAnswers',
     ]);
   });
 

@@ -189,6 +189,11 @@ export class BoardService {
     }).sort((a, b) => Number(b.escalated) - Number(a.escalated) || a.epic.localeCompare(b.epic) || a.id.localeCompare(b.id, undefined, { numeric: true }));
   }
 
+  /** How many answers wait for `sous answer`, from any machine. */
+  async pendingAnswerCount(): Promise<number> {
+    return (await this.store.answers({ pendingOnly: true })).length;
+  }
+
   /** The owner's answer. A later answer before sous applied it replaces the earlier one. */
   async answer(itemId: string, value: unknown, now = new Date()) {
     const row = (await this.store.items()).find((entry) => entry.id === itemId && !entry.removedAt);
